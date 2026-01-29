@@ -16,12 +16,9 @@ from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
 
 
-def truncate_text(text: str, max_length: int = 80) -> str:
-    """Truncate text to max length, adding ellipsis if needed."""
-    text = text.strip().replace("\n", " ")
-    if len(text) <= max_length:
-        return text
-    return text[:max_length - 3] + "..."
+def clean_text(text: str) -> str:
+    """Clean text - remove newlines but preserve full content."""
+    return text.strip().replace("\n", " ").replace("  ", " ")
 
 
 def run_sync(hours: int = 24) -> dict:
@@ -74,7 +71,7 @@ def run_sync(hours: int = 24) -> dict:
                 if action_items:
                     # Create SUGGESTIONS from extracted action items
                     for item in action_items:
-                        title = truncate_text(str(item), 100)
+                        title = clean_text(str(item))
                         if not title:
                             continue
 
@@ -92,7 +89,7 @@ def run_sync(hours: int = 24) -> dict:
                     print(f"   ✓ {meeting['title']}: {len(action_items)} suggestions")
                 else:
                     # No action items found - create a suggestion to review
-                    meeting_title = truncate_text(meeting["title"], 60)
+                    meeting_title = clean_text(meeting["title"])
                     suggestion = Todo(
                         title=f"Review meeting: {meeting_title}",
                         source_type="granola",
@@ -134,12 +131,12 @@ def run_sync(hours: int = 24) -> dict:
 
                 # Clean up Slack formatting (remove user IDs like <@U123>)
                 import re
-                clean_text = re.sub(r'<@[A-Z0-9]+>', '', text)
-                clean_text = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', clean_text)  # Channel links
-                clean_text = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', clean_text)  # URL links
-                clean_text = re.sub(r'<(https?://[^>]+)>', r'\1', clean_text)  # Plain URLs
+                cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
+                cleaned = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', cleaned)  # Channel links
+                cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', cleaned)  # URL links
+                cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)  # Plain URLs
 
-                title = truncate_text(clean_text, 100)
+                title = clean_text(cleaned)
 
                 if not title or len(title) < 5:
                     continue
@@ -148,7 +145,6 @@ def run_sync(hours: int = 24) -> dict:
                 username = mention.get("username", "")
                 if username:
                     title = f"@{username}: {title}"
-                    title = truncate_text(title, 100)
 
                 suggestion = Todo(
                     title=title,

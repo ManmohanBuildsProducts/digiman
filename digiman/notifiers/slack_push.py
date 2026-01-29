@@ -29,52 +29,77 @@ class SlackPusher:
         """Format the morning briefing message."""
         today = date.today()
         lines = [
-            f"🧠 *Digiman Daily Briefing - {today.strftime('%b %d, %Y')}*",
+            f"🧠 *Digiman Daily Briefing - {today.strftime('%A, %b %d, %Y')}*",
             ""
         ]
 
-        # New Suggestions (from overnight sync)
+        # New Suggestions (from overnight sync) - grouped by source
         if suggestions:
-            lines.append(f"💡 *NEW SUGGESTIONS* ({len(suggestions)} items to review):")
-            for sugg in suggestions[:5]:  # Max 5
-                source = f"[{sugg.source_type}]" if sugg.source_type else ""
-                context = f" - _{sugg.source_context}_" if sugg.source_context else ""
-                lines.append(f"• {sugg.title[:60]}{context}")
-            if len(suggestions) > 5:
-                lines.append(f"  _...and {len(suggestions) - 5} more_")
+            # Separate by source
+            granola_suggestions = [s for s in suggestions if s.source_type == 'granola']
+            slack_suggestions = [s for s in suggestions if s.source_type == 'slack']
+
+            lines.append(f"💡 *NEW SUGGESTIONS* ({len(suggestions)} items to review)")
             lines.append("")
 
-        # Overdue
+            # Granola suggestions - grouped by meeting
+            if granola_suggestions:
+                lines.append("*From Meetings:*")
+                # Group by meeting (source_context)
+                meetings = {}
+                for sugg in granola_suggestions:
+                    meeting = sugg.source_context or "Unknown Meeting"
+                    if meeting not in meetings:
+                        meetings[meeting] = []
+                    meetings[meeting].append(sugg)
+
+                for meeting_title, items in meetings.items():
+                    lines.append(f"📝 _{meeting_title}_")
+                    for sugg in items:
+                        lines.append(f"    • {sugg.title}")
+                lines.append("")
+
+            # Slack suggestions
+            if slack_suggestions:
+                lines.append("*From Slack Mentions:*")
+                for sugg in slack_suggestions:
+                    channel = sugg.source_context or "#unknown"
+                    lines.append(f"💬 {channel}: {sugg.title}")
+                lines.append("")
+
+        # Overdue - show all
         if todos.get("overdue"):
-            lines.append(f"🔴 *ACTION NEEDED* ({len(todos['overdue'])} overdue):")
-            for todo in todos["overdue"][:5]:  # Max 5
-                context = f" - _{todo.source_context}_" if todo.source_context else ""
-                days = f" ({todo.days_overdue} day{'s' if todo.days_overdue != 1 else ''})"
-                lines.append(f"• {todo.title}{days}{context}")
+            lines.append(f"🔴 *OVERDUE* ({len(todos['overdue'])} items)")
+            for todo in todos["overdue"]:
+                days = f"({todo.days_overdue}d)" if todo.days_overdue else ""
+                context = f" _{todo.source_context}_" if todo.source_context else ""
+                lines.append(f"• {todo.title} {days}{context}")
             lines.append("")
 
-        # Today
+        # Today - show all
         if todos.get("today"):
-            lines.append(f"📅 *TODAY* ({len(todos['today'])} items):")
-            for todo in todos["today"][:5]:  # Max 5
+            lines.append(f"📅 *TODAY* ({len(todos['today'])} items)")
+            for todo in todos["today"]:
                 context = f" - _{todo.source_context}_" if todo.source_context else ""
                 lines.append(f"• {todo.title}{context}")
             lines.append("")
 
-        # This Week
+        # This Week - show all
         if todos.get("this_week"):
-            lines.append(f"📆 *THIS WEEK* ({len(todos['this_week'])} items):")
-            for todo in todos["this_week"][:3]:  # Max 3
-                lines.append(f"• {todo.title}")
+            lines.append(f"📆 *THIS WEEK* ({len(todos['this_week'])} items)")
+            for todo in todos["this_week"]:
+                context = f" - _{todo.source_context}_" if todo.source_context else ""
+                lines.append(f"• {todo.title}{context}")
             lines.append("")
 
         # No items at all
         if not suggestions and not todos.get("overdue") and not todos.get("today") and not todos.get("this_week"):
-            lines.append("✨ No pending tasks! Enjoy your day.")
+            lines.append("✨ All clear! No pending tasks.")
             lines.append("")
 
         # Footer
-        lines.append("🔗 Open Digiman: https://manmohanbuildsproducts.pythonanywhere.com")
+        lines.append("─────────────────────────")
+        lines.append("🔗 <https://manmohanbuildsproducts.pythonanywhere.com|Open Digiman>")
 
         return "\n".join(lines)
 

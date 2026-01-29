@@ -292,24 +292,27 @@ class Todo:
             """, (today, today, today))
             conn.commit()
 
-            # Get overdue
+            # Get overdue (exclude suggestions)
             overdue_rows = conn.execute("""
                 SELECT * FROM todos
                 WHERE is_overdue = 1 AND status = 'pending'
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
                 ORDER BY due_date ASC
             """).fetchall()
 
-            # Get today's todos
+            # Get today's todos (exclude suggestions)
             today_rows = conn.execute("""
                 SELECT * FROM todos
                 WHERE timeline_type = 'date' AND due_date = ? AND status = 'pending'
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
                 ORDER BY created_at DESC
             """, (today,)).fetchall()
 
-            # Get this week's todos
+            # Get this week's todos (exclude suggestions)
             week_rows = conn.execute("""
                 SELECT * FROM todos
                 WHERE timeline_type = 'week' AND due_week = ? AND status = 'pending'
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
                 ORDER BY created_at DESC
             """, (week_str,)).fetchall()
 
