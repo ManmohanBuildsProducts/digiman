@@ -1,0 +1,117 @@
+name: Auto Debug with Claude
+
+on:
+  workflow_dispatch:
+    inputs:
+      error_context:
+        description: 'Error context from health check'
+        required: true
+        type: string
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10  # Get recent history for context
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Set up Python (for running diagnostics)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Gather diagnostic info
+        id: diagnostics
+        run: |
+          echo "## Recent commits:" > /tmp/diagnostics.txt
+          git log --oneline -10 >> /tmp/diagnostics.txt
+          echo "" >> /tmp/diagnostics.txt
+
+          echo "## Recent changes:" >> /tmp/diagnostics.txt
+          git diff HEAD~3 --stat >> /tmp/diagnostics.txt 2>/dev/null || echo "No recent changes" >> /tmp/diagnostics.txt
+          echo "" >> /tmp/diagnostics.txt
+
+          echo "## Site response:" >> /tmp/diagnostics.txt
+          curl -s -o /tmp/site_response.txt -w "Status: %{http_code}\nTime: %{time_total}s\n" \
+            --max-time 30 "https://manmohanbuildsproducts.pythonanywhere.com" >> /tmp/diagnostics.txt 2>&1 || true
+          cat /tmp/site_response.txt >> /tmp/diagnostics.txt 2>/dev/null || true
+
+          cat /tmp/diagnostics.txt
+
+      - name: Run Claude Code to debug
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          DIAGNOSTICS=$(cat /tmp/diagnostics.txt)
+
+          claude --print --dangerously-skip-permissions "
+          The Digiman website is DOWN. Error: ${{ inputs.error_context }}
+
+          Diagnostics:
+          $DIAGNOSTICS
+
+          Please:
+          1. Analyze the recent commits and code for potential issues
+          2. Check if there are obvious bugs in digiman/app.py or related files
+          3. If you find the issue, create a fix
+          4. If you can't determine the issue, explain what you found
+
+          The site is hosted on PythonAnywhere. Common issues:
+          - Import errors
+          - Database path issues
+          - Missing dependencies
+          - Syntax errors
+
+          Focus on the most likely cause based on recent changes.
+          " 2>&1 | tee /tmp/claude_output.txt
+
+      - name: Create issue with findings
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let claudeOutput = 'No output captured';
+            try {
+              claudeOutput = fs.readFileSync('/tmp/claude_output.txt', 'utf8');
+            } catch (e) {
+              console.log('Could not read Claude output');
+            }
+
+            // Truncate if too long
+            if (claudeOutput.length > 60000) {
+              claudeOutput = claudeOutput.substring(0, 60000) + '\n...(truncated)';
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Auto-Debug: Site Down - ${{ inputs.error_context }}',
+              body: `## Automated Debug Report
+
+            **Trigger:** Health check failed
+            **Error:** ${{ inputs.error_context }}
+            **Time:** ${new Date().toISOString()}
+
+            ## Claude's Analysis
+
+            \`\`\`
+            ${claudeOutput}
+            \`\`\`
+
+            ---
+            *This issue was automatically created by the auto-debug workflow.*
+            `,
+              labels: ['bug', 'auto-debug']
+            });
