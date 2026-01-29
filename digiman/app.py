@@ -5,7 +5,12 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 import calendar
 import json
 
+import os
+import subprocess
 from digiman.config import FLASK_SECRET_KEY, FLASK_DEBUG
+
+# Deploy webhook secret (set in environment)
+DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "")
 from digiman.models import Todo, init_db
 
 app = Flask(__name__)
@@ -292,6 +297,40 @@ def partial_todo_list():
 def partial_add_form():
     """Get the add todo form partial."""
     return render_template("partials/add_form.html", today=date.today())
+
+
+# ============== Deploy Webhook ==============
+
+@app.route("/api/deploy", methods=["POST"])
+def deploy_webhook():
+    """Webhook to trigger git pull for deployment."""
+    # Verify secret token
+    token = request.headers.get("X-Deploy-Token") or request.args.get("token")
+    if not DEPLOY_SECRET or token != DEPLOY_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        # Get the project root directory
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # Run git pull
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        return jsonify({
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Git pull timed out"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

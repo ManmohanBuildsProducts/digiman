@@ -1,0 +1,30 @@
+name: Deploy to PythonAnywhere
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger git pull on PythonAnywhere
+        run: |
+          echo "Triggering deployment..."
+
+          # Call the deploy webhook to git pull
+          PULL_RESPONSE=$(curl -s -X POST \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_SECRET }}" \
+            "https://manmohanbuildsproducts.pythonanywhere.com/api/deploy")
+
+          echo "Git pull response: $PULL_RESPONSE"
+
+          # Reload the web app via PythonAnywhere API
+          echo "Reloading web app..."
+          curl -s -X POST \
+            -H "Authorization: Token ${{ secrets.PA_API_TOKEN }}" \
+            "https://www.pythonanywhere.com/api/v0/user/ManmohanBuildsProducts/webapps/manmohanbuildsproducts.pythonanywhere.com/reload/"
+
+          echo ""
+          echo "✓ Deployment complete!"
