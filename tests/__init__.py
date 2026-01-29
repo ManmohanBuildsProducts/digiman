@@ -1,1 +1,1 @@
-"""Tests for Digiman."""
+# Digiman Test Suite
