@@ -25,13 +25,24 @@ class SlackPusher:
             self._client = WebClient(token=self.bot_token)
         return self._client
 
-    def format_briefing(self, todos: dict) -> str:
+    def format_briefing(self, todos: dict, suggestions: list = None) -> str:
         """Format the morning briefing message."""
         today = date.today()
         lines = [
             f"🧠 *Digiman Daily Briefing - {today.strftime('%b %d, %Y')}*",
             ""
         ]
+
+        # New Suggestions (from overnight sync)
+        if suggestions:
+            lines.append(f"💡 *NEW SUGGESTIONS* ({len(suggestions)} items to review):")
+            for sugg in suggestions[:5]:  # Max 5
+                source = f"[{sugg.source_type}]" if sugg.source_type else ""
+                context = f" - _{sugg.source_context}_" if sugg.source_context else ""
+                lines.append(f"• {sugg.title[:60]}{context}")
+            if len(suggestions) > 5:
+                lines.append(f"  _...and {len(suggestions) - 5} more_")
+            lines.append("")
 
         # Overdue
         if todos.get("overdue"):
@@ -57,13 +68,13 @@ class SlackPusher:
                 lines.append(f"• {todo.title}")
             lines.append("")
 
-        # No items
-        if not todos.get("overdue") and not todos.get("today") and not todos.get("this_week"):
+        # No items at all
+        if not suggestions and not todos.get("overdue") and not todos.get("today") and not todos.get("this_week"):
             lines.append("✨ No pending tasks! Enjoy your day.")
             lines.append("")
 
         # Footer
-        lines.append("🔗 Open Digiman: http://localhost:5000")
+        lines.append("🔗 Open Digiman: https://manmohanbuildsproducts.pythonanywhere.com")
 
         return "\n".join(lines)
 
@@ -80,8 +91,11 @@ class SlackPusher:
             # Get today's todos
             todos = Todo.get_today()
 
+            # Get pending suggestions
+            suggestions = Todo.get_suggestions()
+
             # Format message
-            message = self.format_briefing(todos)
+            message = self.format_briefing(todos, suggestions)
 
             # Open DM channel
             dm_response = self.client.conversations_open(users=[self.user_id])

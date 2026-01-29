@@ -43,6 +43,7 @@ def ensure_db():
 def index():
     """Today view - main dashboard."""
     todos = Todo.get_today()
+    suggestions = Todo.get_suggestions()
     today = date.today()
     current_week = today.isocalendar()
     week_str = f"{current_week[0]}-W{current_week[1]:02d}"
@@ -50,6 +51,7 @@ def index():
     return render_template(
         "index.html",
         todos=todos,
+        suggestions=suggestions,
         today=today,
         week_str=week_str,
         active_page="today"
@@ -273,6 +275,61 @@ def api_trigger_sync():
         return jsonify({"error": f"Sync script not available: {e}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============== Suggestions API ==============
+
+@app.route("/api/suggestions", methods=["GET"])
+def api_get_suggestions():
+    """Get all pending suggestions."""
+    suggestions = Todo.get_suggestions()
+    return jsonify([s.to_dict() for s in suggestions])
+
+
+@app.route("/api/suggestions/<int:suggestion_id>/accept", methods=["POST"])
+def api_accept_suggestion(suggestion_id: int):
+    """Accept a suggestion and convert to todo."""
+    suggestion = Todo.get_by_id(suggestion_id)
+    if not suggestion or not suggestion.is_suggestion:
+        return jsonify({"error": "Suggestion not found"}), 404
+
+    data = get_request_data()
+    timeline_type = data.get("timeline_type", "date")
+    value = data.get("value")
+
+    # Handle shortcuts
+    if timeline_type == "today":
+        timeline_type = "date"
+        value = date.today().isoformat()
+    elif timeline_type == "tomorrow":
+        timeline_type = "date"
+        value = (date.today() + timedelta(days=1)).isoformat()
+    elif timeline_type == "this_week":
+        timeline_type = "week"
+        current_week = date.today().isocalendar()
+        value = f"{current_week[0]}-W{current_week[1]:02d}"
+
+    suggestion.accept_suggestion(timeline_type, value)
+
+    if request.headers.get("HX-Request"):
+        return "", 200  # Remove from suggestions list
+
+    return jsonify(suggestion.to_dict())
+
+
+@app.route("/api/suggestions/<int:suggestion_id>/discard", methods=["POST"])
+def api_discard_suggestion(suggestion_id: int):
+    """Discard a suggestion."""
+    suggestion = Todo.get_by_id(suggestion_id)
+    if not suggestion or not suggestion.is_suggestion:
+        return jsonify({"error": "Suggestion not found"}), 404
+
+    suggestion.discard_suggestion()
+
+    if request.headers.get("HX-Request"):
+        return "", 200  # Remove from suggestions list
+
+    return jsonify({"success": True})
 
 
 # ============== System Status ==============

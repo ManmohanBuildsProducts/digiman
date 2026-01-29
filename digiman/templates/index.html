@@ -141,5 +141,125 @@
             e.target.closest('form').dispatchEvent(new Event('submit'));
         }
     });
+
+    // ============== Suggestions Functions ==============
+
+    async function acceptSuggestion(id, timelineType) {
+        const item = document.querySelector(`.suggestion-item[data-id="${id}"]`);
+        if (item) {
+            item.style.opacity = '0.5';
+            item.style.pointerEvents = 'none';
+        }
+
+        try {
+            const response = await fetch(`/api/suggestions/${id}/accept`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'HX-Request': 'true'
+                },
+                body: JSON.stringify({ timeline_type: timelineType })
+            });
+
+            if (response.ok) {
+                // Remove from suggestions list with animation
+                if (item) {
+                    item.style.transition = 'all 0.3s ease';
+                    item.style.height = item.offsetHeight + 'px';
+                    requestAnimationFrame(() => {
+                        item.style.height = '0';
+                        item.style.padding = '0';
+                        item.style.margin = '0';
+                        item.style.overflow = 'hidden';
+                    });
+                    setTimeout(() => {
+                        item.remove();
+                        checkEmptySuggestions();
+                    }, 300);
+                }
+
+                const label = timelineType === 'today' ? 'Today' : 'This Week';
+                showToast(`Added to ${label}!`, 'success');
+
+                // Refresh the page to show new todo
+                setTimeout(() => location.reload(), 500);
+            } else {
+                if (item) {
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                }
+                showToast('Failed to accept suggestion', 'warning');
+            }
+        } catch (error) {
+            console.error('Error accepting suggestion:', error);
+            if (item) {
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+            }
+            showToast('Something went wrong', 'warning');
+        }
+    }
+
+    async function discardSuggestion(id) {
+        const item = document.querySelector(`.suggestion-item[data-id="${id}"]`);
+        if (item) {
+            item.style.opacity = '0.5';
+            item.style.pointerEvents = 'none';
+        }
+
+        try {
+            const response = await fetch(`/api/suggestions/${id}/discard`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'HX-Request': 'true'
+                }
+            });
+
+            if (response.ok) {
+                // Remove from suggestions list with animation
+                if (item) {
+                    item.style.transition = 'all 0.3s ease';
+                    item.style.height = item.offsetHeight + 'px';
+                    requestAnimationFrame(() => {
+                        item.style.height = '0';
+                        item.style.padding = '0';
+                        item.style.margin = '0';
+                        item.style.overflow = 'hidden';
+                    });
+                    setTimeout(() => {
+                        item.remove();
+                        checkEmptySuggestions();
+                    }, 300);
+                }
+                showToast('Suggestion discarded', 'success');
+            } else {
+                if (item) {
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                }
+                showToast('Failed to discard', 'warning');
+            }
+        } catch (error) {
+            console.error('Error discarding suggestion:', error);
+            if (item) {
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+            }
+            showToast('Something went wrong', 'warning');
+        }
+    }
+
+    function checkEmptySuggestions() {
+        const section = document.getElementById('suggestions-section');
+        if (section) {
+            const items = section.querySelectorAll('.suggestion-item');
+            if (items.length === 0) {
+                section.style.transition = 'all 0.3s ease';
+                section.style.opacity = '0';
+                setTimeout(() => section.remove(), 300);
+            }
+        }
+    }
 </script>
 {% endblock %}

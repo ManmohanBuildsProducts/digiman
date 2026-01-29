@@ -72,40 +72,38 @@ def run_sync(hours: int = 24) -> dict:
                 action_items = meeting.get("action_items", [])
 
                 if action_items:
-                    # Create todos from extracted action items
+                    # Create SUGGESTIONS from extracted action items
                     for item in action_items:
                         title = truncate_text(str(item), 100)
                         if not title:
                             continue
 
-                        todo = Todo(
+                        suggestion = Todo(
                             title=title,
                             source_type="granola",
                             source_id=meeting["id"],
                             source_context=meeting["title"],
                             source_url=meeting.get("url"),
-                            timeline_type="date",
-                            due_date=today,
+                            is_suggestion=True,  # Mark as suggestion, not todo
                         )
-                        todo.save()
+                        suggestion.save()
                         stats["granola_extracted"] += 1
 
-                    print(f"   ✓ {meeting['title']}: {len(action_items)} action items")
+                    print(f"   ✓ {meeting['title']}: {len(action_items)} suggestions")
                 else:
-                    # No action items found - create a reminder to review
+                    # No action items found - create a suggestion to review
                     meeting_title = truncate_text(meeting["title"], 60)
-                    todo = Todo(
+                    suggestion = Todo(
                         title=f"Review meeting: {meeting_title}",
                         source_type="granola",
                         source_id=meeting["id"],
                         source_context=meeting["title"],
                         source_url=meeting.get("url"),
-                        timeline_type="date",
-                        due_date=today,
+                        is_suggestion=True,
                     )
-                    todo.save()
+                    suggestion.save()
                     stats["granola_extracted"] += 1
-                    print(f"   ○ {meeting['title']}: created review reminder")
+                    print(f"   ○ {meeting['title']}: created review suggestion")
 
                 # Mark as processed
                 granola.mark_processed(meeting["id"])
@@ -129,7 +127,7 @@ def run_sync(hours: int = 24) -> dict:
 
         for mention in mentions:
             try:
-                # Create todo directly from mention text
+                # Create SUGGESTION from mention text
                 text = mention.get("text", "")
                 if not text.strip():
                     continue
@@ -152,23 +150,22 @@ def run_sync(hours: int = 24) -> dict:
                     title = f"@{username}: {title}"
                     title = truncate_text(title, 100)
 
-                todo = Todo(
+                suggestion = Todo(
                     title=title,
                     source_type="slack",
                     source_id=mention["id"],
                     source_context=f"#{mention.get('channel_name', 'unknown')}",
                     source_url=mention.get("permalink"),
-                    timeline_type="date",
-                    due_date=today,
+                    is_suggestion=True,  # Mark as suggestion, not todo
                 )
-                todo.save()
+                suggestion.save()
                 stats["slack_extracted"] += 1
 
                 # Mark as processed
                 slack.mark_processed(mention["id"])
                 stats["slack_processed"] += 1
 
-                print(f"   ✓ #{mention.get('channel_name')}: captured mention")
+                print(f"   ✓ #{mention.get('channel_name')}: captured suggestion")
 
             except Exception as e:
                 error = f"Error processing mention {mention.get('id')}: {e}"

@@ -52,6 +52,9 @@ def init_db():
                 is_overdue BOOLEAN DEFAULT FALSE,
                 days_overdue INTEGER DEFAULT 0,
 
+                -- Suggestion flag (items from sync that need user approval)
+                is_suggestion BOOLEAN DEFAULT FALSE,
+
                 -- Metadata
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -111,6 +114,7 @@ class Todo:
             self.status = kwargs.get("status", "pending")
             self.is_overdue = kwargs.get("is_overdue", False)
             self.days_overdue = kwargs.get("days_overdue", 0)
+            self.is_suggestion = kwargs.get("is_suggestion", False)
             self.created_at = kwargs.get("created_at")
             self.updated_at = kwargs.get("updated_at")
             self.completed_at = kwargs.get("completed_at")
@@ -132,6 +136,7 @@ class Todo:
         self.status = row["status"]
         self.is_overdue = bool(row["is_overdue"])
         self.days_overdue = row["days_overdue"]
+        self.is_suggestion = bool(row["is_suggestion"]) if "is_suggestion" in row.keys() else False
         self.created_at = row["created_at"]
         self.updated_at = row["updated_at"]
         self.completed_at = row["completed_at"]
@@ -154,6 +159,7 @@ class Todo:
             "status": self.status,
             "is_overdue": self.is_overdue,
             "days_overdue": self.days_overdue,
+            "is_suggestion": self.is_suggestion,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "completed_at": self.completed_at,
@@ -169,14 +175,14 @@ class Todo:
                         title = ?, description = ?, source_type = ?, source_id = ?,
                         source_context = ?, source_url = ?, timeline_type = ?,
                         due_date = ?, due_week = ?, due_month = ?, status = ?,
-                        is_overdue = ?, days_overdue = ?, updated_at = ?,
+                        is_overdue = ?, days_overdue = ?, is_suggestion = ?, updated_at = ?,
                         completed_at = ?, extraction_confidence = ?
                     WHERE id = ?
                 """, (
                     self.title, self.description, self.source_type, self.source_id,
                     self.source_context, self.source_url, self.timeline_type,
                     self.due_date, self.due_week, self.due_month, self.status,
-                    self.is_overdue, self.days_overdue, datetime.now().isoformat(),
+                    self.is_overdue, self.days_overdue, self.is_suggestion, datetime.now().isoformat(),
                     self.completed_at, self.extraction_confidence, self.id
                 ))
             else:
@@ -184,13 +190,13 @@ class Todo:
                     INSERT INTO todos (
                         title, description, source_type, source_id, source_context,
                         source_url, timeline_type, due_date, due_week, due_month,
-                        status, is_overdue, days_overdue, extraction_confidence
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        status, is_overdue, days_overdue, is_suggestion, extraction_confidence
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     self.title, self.description, self.source_type, self.source_id,
                     self.source_context, self.source_url, self.timeline_type,
                     self.due_date, self.due_week, self.due_month, self.status,
-                    self.is_overdue, self.days_overdue, self.extraction_confidence
+                    self.is_overdue, self.days_overdue, self.is_suggestion, self.extraction_confidence
                 ))
                 self.id = cursor.lastrowid
             conn.commit()
@@ -379,6 +385,44 @@ class Todo:
             cursor = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+    @classmethod
+    def get_suggestions(cls) -> List["Todo"]:
+        """Get all pending suggestions (not yet accepted as todos)."""
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT * FROM todos
+                WHERE is_suggestion = 1 AND status = 'pending'
+                ORDER BY created_at DESC
+            """).fetchall()
+            return [cls(row=row) for row in rows]
+
+    def accept_suggestion(self, timeline_type: str, value: Optional[str] = None):
+        """Accept a suggestion and convert it to a real todo.
+
+        Args:
+            timeline_type: 'date', 'week', or 'backlog'
+            value: The date (YYYY-MM-DD) or week (YYYY-Wxx) value
+        """
+        self.is_suggestion = False
+        self.timeline_type = timeline_type
+        self.due_date = None
+        self.due_week = None
+        self.due_month = None
+
+        if timeline_type == "date" and value:
+            self.due_date = value
+        elif timeline_type == "week" and value:
+            self.due_week = value
+
+        self._update_overdue_status()
+        self.save()
+
+    def discard_suggestion(self):
+        """Discard a suggestion (mark as completed/discarded)."""
+        self.status = "discarded"
+        self.is_suggestion = False
+        self.save()
 
 
 class SyncHistory:
