@@ -4,10 +4,15 @@
 import rumps
 import requests
 import webbrowser
-from datetime import date, timedelta
+import json
+import os
+from datetime import date, timedelta, datetime
+from pathlib import Path
 
 # Configuration
 API_BASE = "https://manmohanbuildsproducts.pythonanywhere.com"
+LOCAL_API = "http://localhost:5050"
+STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 
 
 class DigimanMenuBar(rumps.App):
@@ -78,6 +83,28 @@ class DigimanMenuBar(rumps.App):
         self.menu.add(None)  # separator
         self.menu.add(rumps.MenuItem("➕  New Todo", callback=self.on_add_todo))
         self.menu.add(rumps.MenuItem("🔄  Refresh", callback=self.on_refresh))
+
+        # === SYSTEM STATUS ===
+        self.menu.add(None)  # separator
+        status = self.get_cron_status()
+        if status:
+            last_sync = status.get("last_sync")
+            if last_sync:
+                try:
+                    dt = datetime.fromisoformat(last_sync)
+                    ago = self.time_ago(dt)
+                    sync_status = status.get("last_sync_status", "unknown")
+                    icon = "✅" if sync_status == "success" else "❌"
+                    self.menu.add(rumps.MenuItem(f"{icon}  Last sync: {ago}", callback=None))
+                except:
+                    self.menu.add(rumps.MenuItem("⏳  No sync yet", callback=None))
+            else:
+                self.menu.add(rumps.MenuItem("⏳  No sync yet", callback=None))
+        else:
+            self.menu.add(rumps.MenuItem("⏳  No sync yet", callback=None))
+
+        self.menu.add(rumps.MenuItem("⚙️  System Status", callback=self.on_open_status))
+        self.menu.add(rumps.MenuItem("▶️  Run Sync Now", callback=self.on_run_sync))
 
         # === WEB ===
         self.menu.add(None)  # separator
@@ -168,6 +195,54 @@ class DigimanMenuBar(rumps.App):
     def on_open_web(self, _):
         """Open web UI."""
         webbrowser.open(API_BASE)
+
+    def on_open_status(self, _):
+        """Open local system status page."""
+        webbrowser.open(f"{LOCAL_API}/status")
+
+    def on_run_sync(self, _):
+        """Manually trigger a sync."""
+        try:
+            rumps.notification("Digiman", "Starting sync...", "This may take a moment")
+            response = requests.post(f"{LOCAL_API}/api/sync", timeout=60)
+            if response.ok:
+                result = response.json()
+                count = result.get("new_todos", 0)
+                rumps.notification("Digiman", "✅ Sync complete", f"{count} new action items")
+                self.refresh_todos()
+            else:
+                rumps.notification("Digiman", "❌ Sync failed", response.text[:50])
+        except requests.exceptions.ConnectionError:
+            rumps.notification("Digiman", "❌ Local server not running", "Start with: python run.py")
+        except Exception as e:
+            rumps.notification("Digiman", "❌ Sync error", str(e)[:50])
+
+    def get_cron_status(self):
+        """Read cron status from file."""
+        try:
+            if STATUS_FILE.exists():
+                return json.loads(STATUS_FILE.read_text())
+        except:
+            pass
+        return None
+
+    def time_ago(self, dt):
+        """Convert datetime to human-readable 'time ago' string."""
+        now = datetime.now()
+        diff = now - dt
+        seconds = diff.total_seconds()
+
+        if seconds < 60:
+            return "just now"
+        elif seconds < 3600:
+            mins = int(seconds / 60)
+            return f"{mins}m ago"
+        elif seconds < 86400:
+            hours = int(seconds / 3600)
+            return f"{hours}h ago"
+        else:
+            days = int(seconds / 86400)
+            return f"{days}d ago"
 
 
 if __name__ == "__main__":

@@ -275,6 +275,24 @@ def api_trigger_sync():
         return jsonify({"error": str(e)}), 500
 
 
+# ============== System Status ==============
+
+@app.route("/status")
+def status_page():
+    """System status dashboard."""
+    from pathlib import Path
+
+    status_file = Path.home() / ".digiman" / "cron_status.json"
+    cron_status = {}
+    if status_file.exists():
+        try:
+            cron_status = json.loads(status_file.read_text())
+        except:
+            pass
+
+    return render_template("status.html", cron_status=cron_status, active_page="status")
+
+
 # ============== HTMX Partials ==============
 
 @app.route("/partials/todo-list")

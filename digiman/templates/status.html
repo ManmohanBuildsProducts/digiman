@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}System Status - Digiman{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="statusApp()">
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <i data-lucide="activity" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">System Status</h1>
+                    <p class="text-sm text-gray-500">Monitor sync jobs and automation</p>
+                </div>
+            </div>
+            <button @click="runSync()"
+                    :disabled="isSyncing"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <i data-lucide="play" class="w-4 h-4" :class="{ 'animate-spin': isSyncing }"></i>
+                <span x-text="isSyncing ? 'Syncing...' : 'Run Sync Now'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Sync Status Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Last Sync -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="refresh-cw" class="w-5 h-5 text-blue-600"></i>
+                </div>
+                <div class="text-sm font-medium text-gray-500">Last Sync</div>
+            </div>
+            {% if cron_status.last_sync %}
+            <div class="text-2xl font-bold text-gray-900">{{ cron_status.last_sync[:16] | replace('T', ' ') }}</div>
+            <div class="text-sm text-gray-500 mt-1">
+                {% if cron_status.last_sync_status == 'success' %}
+                <span class="text-green-600">✓ Success</span>
+                {% else %}
+                <span class="text-red-600">✗ Failed</span>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="text-2xl font-bold text-gray-400">Never</div>
+            <div class="text-sm text-gray-500 mt-1">No sync has run yet</div>
+            {% endif %}
+        </div>
+
+        <!-- Items Synced -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                </div>
+                <div class="text-sm font-medium text-gray-500">Last Sync Items</div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900">{{ cron_status.last_sync_count or 0 }}</div>
+            <div class="text-sm text-gray-500 mt-1">Action items extracted</div>
+        </div>
+
+        <!-- Sources -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="layers" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <div class="text-sm font-medium text-gray-500">Active Sources</div>
+            </div>
+            <div class="text-2xl font-bold text-gray-900">{{ cron_status.sources | length if cron_status.sources else 0 }}</div>
+            <div class="text-sm text-gray-500 mt-1">
+                {% if cron_status.sources %}
+                {{ cron_status.sources | join(', ') }}
+                {% else %}
+                No sources configured
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync History -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-4 border-b border-gray-200">
+            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Recent Sync History</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% if cron_status.history %}
+                {% for entry in cron_status.history[:10] %}
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        {% if entry.status == 'success' %}
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <i data-lucide="check" class="w-4 h-4 text-green-600"></i>
+                        </div>
+                        {% else %}
+                        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                            <i data-lucide="x" class="w-4 h-4 text-red-600"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">{{ entry.timestamp[:16] | replace('T', ' ') }}</div>
+                            <div class="text-xs text-gray-500">{{ entry.source or 'Manual' }} • {{ entry.count or 0 }} items</div>
+                        </div>
+                    </div>
+                    {% if entry.error %}
+                    <div class="text-xs text-red-600 max-w-xs truncate">{{ entry.error }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-8 text-center text-gray-400">
+                    <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p class="text-sm">No sync history yet</p>
+                    <p class="text-xs mt-1">Click "Run Sync Now" to start</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-4 border-b border-gray-200">
+            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Configuration</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="flex items-center justify-between py-2">
+                <div>
+                    <div class="text-sm font-medium text-gray-900">Granola Integration</div>
+                    <div class="text-xs text-gray-500">Auto-extract action items from meeting notes</div>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.granola_enabled else 'bg-gray-100 text-gray-500' }}">
+                    {{ 'Enabled' if cron_status.granola_enabled else 'Not configured' }}
+                </span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+                <div>
+                    <div class="text-sm font-medium text-gray-900">Slack Integration</div>
+                    <div class="text-xs text-gray-500">Import action items from Slack threads</div>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.slack_enabled else 'bg-gray-100 text-gray-500' }}">
+                    {{ 'Enabled' if cron_status.slack_enabled else 'Not configured' }}
+                </span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+                <div>
+                    <div class="text-sm font-medium text-gray-900">Morning Push</div>
+                    <div class="text-xs text-gray-500">Daily Slack notification with today's todos</div>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.morning_push_enabled else 'bg-gray-100 text-gray-500' }}">
+                    {{ 'Enabled' if cron_status.morning_push_enabled else 'Not configured' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Result Toast -->
+    <div x-show="syncResult"
+         x-transition
+         class="fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg"
+         :class="syncResult?.success ? 'bg-green-500 text-white' : 'bg-red-500 text-white'">
+        <span x-text="syncResult?.message"></span>
+    </div>
+</div>
+
+<script>
+function statusApp() {
+    return {
+        isSyncing: false,
+        syncResult: null,
+
+        async runSync() {
+            this.isSyncing = true;
+            this.syncResult = null;
+
+            try {
+                const response = await fetch('/api/sync', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok) {
+                    this.syncResult = {
+                        success: true,
+                        message: `✓ Synced ${data.new_todos || 0} new items`
+                    };
+                    // Reload page after 2 seconds to show updated status
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    this.syncResult = {
+                        success: false,
+                        message: `✗ ${data.error || 'Sync failed'}`
+                    };
+                }
+            } catch (error) {
+                this.syncResult = {
+                    success: false,
+                    message: `✗ ${error.message}`
+                };
+            } finally {
+                this.isSyncing = false;
+                // Hide toast after 5 seconds
+                setTimeout(() => this.syncResult = null, 5000);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

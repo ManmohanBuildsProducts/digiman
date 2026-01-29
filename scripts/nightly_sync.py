@@ -2,11 +2,15 @@
 """Nightly sync script - Run at 11 PM via cron/launchd."""
 
 import sys
+import json
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Status file for menu bar app
+STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 
 from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
@@ -192,7 +196,65 @@ def run_sync(hours: int = 24) -> dict:
         print(f"   Errors: {len(stats['errors'])}")
     print("✅ Sync complete!")
 
-    return stats
+    # Update status file for menu bar app
+    update_status_file(stats, total_extracted)
+
+    return {
+        "new_todos": total_extracted,
+        "processed": total_processed,
+        "errors": stats["errors"]
+    }
+
+
+def update_status_file(stats, total_extracted):
+    """Update the status file for the menu bar app."""
+    try:
+        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing status
+        status = {}
+        if STATUS_FILE.exists():
+            try:
+                status = json.loads(STATUS_FILE.read_text())
+            except:
+                pass
+
+        # Update status
+        now = datetime.now().isoformat()
+        status["last_sync"] = now
+        status["last_sync_status"] = "success" if not stats["errors"] else "error"
+        status["last_sync_count"] = total_extracted
+
+        # Determine active sources
+        sources = []
+        if stats["granola_processed"] > 0:
+            sources.append("Granola")
+        if stats["slack_processed"] > 0:
+            sources.append("Slack")
+        status["sources"] = sources
+
+        # Add to history
+        history = status.get("history", [])
+        history.insert(0, {
+            "timestamp": now,
+            "status": "success" if not stats["errors"] else "error",
+            "count": total_extracted,
+            "source": "nightly_sync",
+            "error": stats["errors"][0] if stats["errors"] else None
+        })
+        status["history"] = history[:50]  # Keep last 50 entries
+
+        # Check integrations
+        from digiman.config import SLACK_BOT_TOKEN, GRANOLA_CACHE_PATH
+        status["granola_enabled"] = Path(GRANOLA_CACHE_PATH).exists() if GRANOLA_CACHE_PATH else False
+        status["slack_enabled"] = bool(SLACK_BOT_TOKEN)
+        status["morning_push_enabled"] = bool(SLACK_BOT_TOKEN)
+
+        # Write status
+        STATUS_FILE.write_text(json.dumps(status, indent=2))
+
+    except Exception as e:
+        print(f"Warning: Could not update status file: {e}")
 
 
 if __name__ == "__main__":
