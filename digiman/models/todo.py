@@ -92,6 +92,21 @@ def init_db():
         """)
         conn.commit()
 
+        # Run migrations for existing databases
+        _run_migrations(conn)
+
+
+def _run_migrations(conn):
+    """Run schema migrations for existing databases."""
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(todos)")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    # Migration: Add is_suggestion column if it doesn't exist
+    if "is_suggestion" not in columns:
+        cursor.execute("ALTER TABLE todos ADD COLUMN is_suggestion BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
 
 class Todo:
     """Todo item model."""
