@@ -365,6 +365,57 @@ def api_discard_suggestion(suggestion_id: int):
     return jsonify({"success": True})
 
 
+@app.route("/api/suggestions/import", methods=["POST"])
+def api_import_suggestions():
+    """Bulk import suggestions (for syncing from local to remote)."""
+    # Verify deploy token for security
+    token = request.headers.get("X-Deploy-Token") or request.args.get("token")
+    if not DEPLOY_SECRET or token != DEPLOY_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = get_request_data()
+    suggestions_data = data.get("suggestions", [])
+
+    if not suggestions_data:
+        return jsonify({"error": "No suggestions provided"}), 400
+
+    imported = 0
+    skipped = 0
+
+    for item in suggestions_data:
+        # Skip if already exists (by source_id)
+        source_id = item.get("source_id")
+        if source_id:
+            from digiman.models import ProcessedSource
+            if ProcessedSource.is_processed(item.get("source_type", "manual"), source_id):
+                skipped += 1
+                continue
+
+        todo = Todo(
+            title=item.get("title", "Imported suggestion"),
+            description=item.get("description"),
+            source_type=item.get("source_type", "manual"),
+            source_id=source_id,
+            source_context=item.get("source_context"),
+            source_url=item.get("source_url"),
+            is_suggestion=True,
+            extraction_confidence=item.get("extraction_confidence")
+        )
+        todo.save()
+
+        # Mark as processed to avoid re-import
+        if source_id:
+            ProcessedSource.mark_processed(item.get("source_type", "manual"), source_id)
+
+        imported += 1
+
+    return jsonify({
+        "success": True,
+        "imported": imported,
+        "skipped": skipped
+    })
+
+
 # ============== System Status ==============
 
 @app.route("/status")
