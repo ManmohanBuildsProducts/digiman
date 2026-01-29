@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""Nightly sync script - Run at 11 PM via cron/launchd."""
+
+import sys
+from pathlib import Path
+from datetime import date
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from digiman.models import Todo, SyncHistory, init_db
+from digiman.ingesters import GranolaIngester, SlackIngester
+
+
+def truncate_text(text: str, max_length: int = 80) -> str:
+    """Truncate text to max length, adding ellipsis if needed."""
+    text = text.strip().replace("\n", " ")
+    if len(text) <= max_length:
+        return text
+    return text[:max_length - 3] + "..."
+
+
+def run_sync(hours: int = 24) -> dict:
+    """Run the full sync process.
+
+    Uses Granola's built-in action items (no AI extraction).
+    Captures Slack @mentions as todos directly.
+
+    Args:
+        hours: Look back this many hours for new content
+
+    Returns:
+        Dict with sync statistics
+    """
+    print("🧠 Digiman Nightly Sync")
+    print("=" * 40)
+
+    # Ensure database exists
+    init_db()
+
+    # Track stats
+    stats = {
+        "granola_processed": 0,
+        "granola_extracted": 0,
+        "slack_processed": 0,
+        "slack_extracted": 0,
+        "errors": []
+    }
+
+    # Start sync record
+    sync_id = SyncHistory.start("full")
+
+    # Initialize ingesters
+    granola = GranolaIngester()
+    slack = SlackIngester()
+
+    today = date.today().isoformat()
+
+    # ========== Granola Sync ==========
+    print("\n📝 Processing Granola meetings...")
+    try:
+        meetings = granola.get_recent_meetings(hours=hours)
+        print(f"   Found {len(meetings)} new meetings")
+
+        for meeting in meetings:
+            try:
+                # Use action items extracted from summary
+                action_items = meeting.get("action_items", [])
+
+                if action_items:
+                    # Create todos from extracted action items
+                    for item in action_items:
+                        title = truncate_text(str(item), 100)
+                        if not title:
+                            continue
+
+                        todo = Todo(
+                            title=title,
+                            source_type="granola",
+                            source_id=meeting["id"],
+                            source_context=meeting["title"],
+                            source_url=meeting.get("url"),
+                            timeline_type="date",
+                            due_date=today,
+                        )
+                        todo.save()
+                        stats["granola_extracted"] += 1
+
+                    print(f"   ✓ {meeting['title']}: {len(action_items)} action items")
+                else:
+                    # No action items found - create a reminder to review
+                    meeting_title = truncate_text(meeting["title"], 60)
+                    todo = Todo(
+                        title=f"Review meeting: {meeting_title}",
+                        source_type="granola",
+                        source_id=meeting["id"],
+                        source_context=meeting["title"],
+                        source_url=meeting.get("url"),
+                        timeline_type="date",
+                        due_date=today,
+                    )
+                    todo.save()
+                    stats["granola_extracted"] += 1
+                    print(f"   ○ {meeting['title']}: created review reminder")
+
+                # Mark as processed
+                granola.mark_processed(meeting["id"])
+                stats["granola_processed"] += 1
+
+            except Exception as e:
+                error = f"Error processing meeting {meeting.get('id')}: {e}"
+                print(f"   ❌ {error}")
+                stats["errors"].append(error)
+
+    except Exception as e:
+        error = f"Granola sync error: {e}"
+        print(f"   ❌ {error}")
+        stats["errors"].append(error)
+
+    # ========== Slack Sync ==========
+    print("\n💬 Processing Slack mentions...")
+    try:
+        mentions = slack.get_recent_mentions(hours=hours)
+        print(f"   Found {len(mentions)} new mentions")
+
+        for mention in mentions:
+            try:
+                # Create todo directly from mention text
+                text = mention.get("text", "")
+                if not text.strip():
+                    continue
+
+                # Clean up Slack formatting (remove user IDs like <@U123>)
+                import re
+                clean_text = re.sub(r'<@[A-Z0-9]+>', '', text)
+                clean_text = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', clean_text)  # Channel links
+                clean_text = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', clean_text)  # URL links
+                clean_text = re.sub(r'<(https?://[^>]+)>', r'\1', clean_text)  # Plain URLs
+
+                title = truncate_text(clean_text, 100)
+
+                if not title or len(title) < 5:
+                    continue
+
+                # Prefix with username if available
+                username = mention.get("username", "")
+                if username:
+                    title = f"@{username}: {title}"
+                    title = truncate_text(title, 100)
+
+                todo = Todo(
+                    title=title,
+                    source_type="slack",
+                    source_id=mention["id"],
+                    source_context=f"#{mention.get('channel_name', 'unknown')}",
+                    source_url=mention.get("permalink"),
+                    timeline_type="date",
+                    due_date=today,
+                )
+                todo.save()
+                stats["slack_extracted"] += 1
+
+                # Mark as processed
+                slack.mark_processed(mention["id"])
+                stats["slack_processed"] += 1
+
+                print(f"   ✓ #{mention.get('channel_name')}: captured mention")
+
+            except Exception as e:
+                error = f"Error processing mention {mention.get('id')}: {e}"
+                print(f"   ❌ {error}")
+                stats["errors"].append(error)
+
+    except Exception as e:
+        error = f"Slack sync error: {e}"
+        print(f"   ❌ {error}")
+        stats["errors"].append(error)
+
+    # Complete sync record
+    total_processed = stats["granola_processed"] + stats["slack_processed"]
+    total_extracted = stats["granola_extracted"] + stats["slack_extracted"]
+    errors_str = "; ".join(stats["errors"]) if stats["errors"] else None
+
+    SyncHistory.complete(sync_id, total_processed, total_extracted, errors_str)
+
+    # Summary
+    print("\n" + "=" * 40)
+    print("📊 Sync Summary:")
+    print(f"   Granola: {stats['granola_processed']} meetings → {stats['granola_extracted']} todos")
+    print(f"   Slack: {stats['slack_processed']} mentions → {stats['slack_extracted']} todos")
+    if stats["errors"]:
+        print(f"   Errors: {len(stats['errors'])}")
+    print("✅ Sync complete!")
+
+    return stats
+
+
+if __name__ == "__main__":
+    run_sync()

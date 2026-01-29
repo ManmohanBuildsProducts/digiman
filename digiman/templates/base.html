@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Digiman{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script defer src="https://unpkg.com/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        /* Todo Item Styles */
+        .todo-item {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+        .todo-item:hover {
+            background-color: rgb(249, 250, 251);
+        }
+        .todo-item.completed {
+            opacity: 0.5;
+        }
+        .todo-item.completed .todo-title {
+            text-decoration: line-through;
+            color: rgb(156, 163, 175);
+        }
+        .todo-item.dragging {
+            opacity: 0.5;
+            background-color: rgb(243, 244, 246);
+        }
+        .todo-item.expanded {
+            background-color: rgb(249, 250, 251);
+        }
+
+        /* Expand hint */
+        .todo-item .expand-hint {
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .todo-item:hover .expand-hint {
+            opacity: 0.4;
+        }
+        .todo-item.expanded .expand-hint {
+            opacity: 0.6;
+            transform: rotate(180deg);
+        }
+
+        /* Custom Checkbox */
+        .checkbox-custom {
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .checkbox-custom:checked {
+            background-color: #10b981;
+            border-color: #10b981;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .checkbox-custom:hover {
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        .checkbox-custom:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        /* HTMX Loading */
+        .htmx-request {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .htmx-request::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            margin: -8px 0 0 -8px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        /* Section Headers */
+        .section-header {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: none;
+            animation: slideDown 0.15s ease;
+        }
+        .todo-item.expanded .action-buttons {
+            display: flex;
+        }
+
+        /* Drag Handle */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: rgb(219, 234, 254);
+        }
+        .drag-handle {
+            cursor: grab;
+            opacity: 0.3;
+            transition: opacity 0.15s;
+        }
+        .todo-item:hover .drag-handle {
+            opacity: 0.6;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toast-success {
+            background: #10b981;
+            color: white;
+        }
+        .toast-info {
+            background: #3b82f6;
+            color: white;
+        }
+        .toast-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        /* Input Styles */
+        .input-with-hint {
+            position: relative;
+        }
+        .input-hint {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: #9ca3af;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .input-with-hint input:focus + .input-hint {
+            opacity: 1;
+        }
+
+        /* Button Loading State */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+        }
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            top: 50%;
+            left: 50%;
+            margin: -7px 0 0 -7px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Overdue urgency */
+        .overdue-item {
+            border-left: 3px solid #ef4444;
+        }
+
+        /* Quick action on hover */
+        .quick-complete {
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .todo-item:hover .quick-complete {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-50">
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="min-h-full">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-14">
+                    <div class="flex items-center">
+                        <a href="/" class="flex items-center gap-2">
+                            <span class="text-xl">🧠</span>
+                            <span class="text-lg font-semibold text-gray-900">Digiman</span>
+                        </a>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <a href="/"
+                           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                                  {% if active_page == 'today' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                            Today
+                        </a>
+                        <a href="/calendar"
+                           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                                  {% if active_page == 'calendar' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                            Calendar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            const icons = {
+                success: '✓',
+                info: 'ℹ',
+                warning: '⚠'
+            };
+
+            toast.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Re-initialize icons after HTMX swaps
+        document.body.addEventListener('htmx:afterSwap', function(e) {
+            lucide.createIcons();
+            initSortable();
+        });
+
+        document.body.addEventListener('htmx:afterSettle', function(e) {
+            lucide.createIcons();
+        });
+
+        // Show toast on successful HTMX requests
+        document.body.addEventListener('htmx:afterRequest', function(e) {
+            if (e.detail.successful) {
+                const target = e.detail.elt;
+                if (target.matches('input[type="checkbox"]')) {
+                    const isChecked = target.checked;
+                    showToast(isChecked ? 'Marked as done!' : 'Marked as pending', 'success');
+                } else if (target.matches('[hx-delete]')) {
+                    showToast('Todo deleted', 'info');
+                } else if (target.matches('.reassign-btn')) {
+                    showToast('Todo moved', 'success');
+                }
+            }
+        });
+
+        // Toggle todo expansion on card click
+        document.addEventListener('click', function(e) {
+            const todoItem = e.target.closest('.todo-item');
+            if (!todoItem) return;
+
+            // Don't toggle if clicking on checkbox, button, or link
+            if (e.target.closest('input[type="checkbox"]') ||
+                e.target.closest('button') ||
+                e.target.closest('a') ||
+                e.target.closest('.drag-handle')) {
+                return;
+            }
+
+            // Toggle expanded state
+            const wasExpanded = todoItem.classList.contains('expanded');
+
+            // Close all other expanded items
+            document.querySelectorAll('.todo-item.expanded').forEach(item => {
+                item.classList.remove('expanded');
+            });
+
+            // Toggle this item
+            if (!wasExpanded) {
+                todoItem.classList.add('expanded');
+            }
+        });
+
+        // Initialize SortableJS for drag and drop
+        function initSortable() {
+            document.querySelectorAll('.todo-section-content').forEach(container => {
+                if (container._sortable) return; // Already initialized
+
+                container._sortable = new Sortable(container, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'sortable-ghost',
+                    dragClass: 'dragging',
+                    onEnd: function(evt) {
+                        // Get the new order of todo IDs
+                        const order = Array.from(container.querySelectorAll('.todo-item'))
+                            .map(item => item.id.replace('todo-', ''));
+
+                        // Send to server
+                        fetch('/api/todos/reorder', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order: order })
+                        }).then(() => {
+                            showToast('Order saved', 'info');
+                        });
+                    }
+                });
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initSortable();
+        });
+
+        // Keyboard shortcut: Escape to collapse expanded item
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.todo-item.expanded').forEach(item => {
+                    item.classList.remove('expanded');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

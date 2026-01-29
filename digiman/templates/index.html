@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Today - Digiman{% endblock %}
+
+{% block content %}
+<div id="todo-container">
+    {% include "partials/todo_list.html" %}
+</div>
+
+<script>
+    // Toggle description field
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.toggle-desc')) return;
+
+        const btn = e.target.closest('.toggle-desc');
+        const form = btn.closest('form');
+        const descRow = form.querySelector('.desc-row');
+        const icon = btn.querySelector('i');
+        const text = btn.querySelector('span');
+
+        if (descRow.classList.contains('hidden')) {
+            descRow.classList.remove('hidden');
+            text.textContent = 'Hide details';
+            icon.setAttribute('data-lucide', 'minus');
+            lucide.createIcons();
+            descRow.querySelector('input').focus();
+        } else {
+            descRow.classList.add('hidden');
+            text.textContent = 'Add details';
+            icon.setAttribute('data-lucide', 'plus');
+            lucide.createIcons();
+        }
+    });
+
+    // Handle all add-todo-form submissions
+    document.addEventListener('submit', async function(e) {
+        const form = e.target.closest('.add-todo-form');
+        if (!form) return;
+
+        e.preventDefault();
+
+        const titleInput = form.querySelector('.todo-title-input');
+        const descInput = form.querySelector('.todo-desc-input');
+        const submitBtn = form.querySelector('.submit-btn');
+        const title = titleInput.value.trim();
+        const description = descInput ? descInput.value.trim() : '';
+
+        if (!title) {
+            titleInput.focus();
+            titleInput.classList.add('ring-2', 'ring-red-500');
+            setTimeout(() => titleInput.classList.remove('ring-2', 'ring-red-500'), 1000);
+            return;
+        }
+
+        const timeline = form.dataset.timeline;
+        const dueDate = form.dataset.date;
+        const dueWeek = form.dataset.week;
+
+        const payload = {
+            title: title,
+            description: description || null,
+            timeline_type: timeline
+        };
+
+        if (timeline === 'date' && dueDate) {
+            payload.due_date = dueDate;
+        } else if (timeline === 'week' && dueWeek) {
+            payload.due_week = dueWeek;
+        }
+
+        // Show loading state
+        submitBtn.classList.add('btn-loading');
+        titleInput.disabled = true;
+
+        try {
+            const response = await fetch('/api/todos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'HX-Request': 'true'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const html = await response.text();
+
+                // Find the correct section content
+                let section;
+                if (timeline === 'date') {
+                    section = document.querySelector('#today-section .todo-section-content');
+                } else if (timeline === 'week') {
+                    section = document.querySelector('#week-section .todo-section-content');
+                }
+
+                if (section) {
+                    // Remove empty state if present
+                    const emptyState = section.querySelector('.text-center');
+                    if (emptyState) {
+                        emptyState.remove();
+                    }
+                    section.insertAdjacentHTML('beforeend', html);
+                    lucide.createIcons();
+                    initSortable();
+                }
+
+                // Clear inputs and hide description
+                titleInput.value = '';
+                if (descInput) {
+                    descInput.value = '';
+                    const descRow = form.querySelector('.desc-row');
+                    const toggleBtn = form.querySelector('.toggle-desc');
+                    if (descRow && !descRow.classList.contains('hidden')) {
+                        descRow.classList.add('hidden');
+                        toggleBtn.querySelector('span').textContent = 'Add details';
+                        toggleBtn.querySelector('i').setAttribute('data-lucide', 'plus');
+                        lucide.createIcons();
+                    }
+                }
+
+                // Show success toast
+                showToast('Todo added!', 'success');
+            } else {
+                showToast('Failed to add todo', 'warning');
+            }
+        } catch (error) {
+            console.error('Error adding todo:', error);
+            showToast('Something went wrong', 'warning');
+        } finally {
+            // Remove loading state
+            submitBtn.classList.remove('btn-loading');
+            titleInput.disabled = false;
+            titleInput.focus();
+        }
+    });
+
+    // Handle Enter key on description input to submit form
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.classList.contains('todo-desc-input')) {
+            e.preventDefault();
+            e.target.closest('form').dispatchEvent(new Event('submit'));
+        }
+    });
+</script>
+{% endblock %}
