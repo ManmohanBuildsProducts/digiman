@@ -14,7 +14,7 @@ Open a **Bash console** on PythonAnywhere (Consoles → Bash):
 
 ```bash
 # Clone your repo
-git clone https://github.com/Mission10k/digiman.git
+git clone https://github.com/ManmohanBuildsProducts/digiman.git
 cd digiman
 
 # Create virtual environment
@@ -145,4 +145,4 @@ Then click **Reload** on the Web tab.
 
 ## GitHub Repo
 
-https://github.com/Mission10k/digiman
+https://github.com/ManmohanBuildsProducts/digiman
