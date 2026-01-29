@@ -1,7 +1,7 @@
 """Tests for Slack ingester."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
@@ -9,44 +9,60 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from digiman.ingesters.slack import SlackIngester
-
 
 class TestSlackIngester:
     """Tests for SlackIngester."""
 
-    def test_init_with_explicit_none(self):
-        """Test initialization with explicit None values."""
-        # When explicit None is passed, it should stay None (not fall back to config)
-        ingester = SlackIngester(bot_token="", user_id="")
-        assert ingester.bot_token == ""
-        assert ingester.user_id == ""
+    @patch('digiman.ingesters.slack.SLACK_BOT_TOKEN', None)
+    @patch('digiman.ingesters.slack.SLACK_USER_ID', None)
+    def test_init_with_explicit_values(self):
+        """Test initialization with explicit values."""
+        from digiman.ingesters.slack import SlackIngester
+        ingester = SlackIngester(bot_token="test-token", user_id="U12345")
+        assert ingester.bot_token == "test-token"
+        assert ingester.user_id == "U12345"
 
+    @patch('digiman.ingesters.slack.SLACK_BOT_TOKEN', None)
+    @patch('digiman.ingesters.slack.SLACK_USER_ID', None)
     def test_get_recent_mentions_no_credentials(self):
         """Test handling of missing credentials."""
+        from digiman.ingesters.slack import SlackIngester
         ingester = SlackIngester(bot_token=None, user_id=None)
         mentions = ingester.get_recent_mentions()
         assert mentions == []
 
-    @patch('digiman.ingesters.slack.SlackIngester.client')
-    def test_get_recent_mentions_success(self, mock_client):
+    @patch('digiman.ingesters.slack.SLACK_BOT_TOKEN', None)
+    @patch('digiman.ingesters.slack.SLACK_USER_ID', None)
+    @patch('digiman.ingesters.slack.ProcessedSource')
+    def test_get_recent_mentions_success(self, mock_processed):
         """Test successful mention fetching."""
-        mock_client.search_messages.return_value = {
-            "messages": {
-                "matches": [
-                    {
-                        "ts": "1706500000.000000",
-                        "text": "Hey <@U12345> can you review this?",
-                        "channel": {"id": "C12345", "name": "general"},
-                        "user": "U67890",
-                        "username": "john",
-                        "permalink": "https://slack.com/archives/..."
-                    }
-                ]
-            }
-        }
+        from digiman.ingesters.slack import SlackIngester
+
+        mock_processed.is_processed.return_value = False
 
         ingester = SlackIngester(bot_token="xoxb-test", user_id="U12345")
+
+        # Mock the client
+        mock_client = MagicMock()
+        mock_client.conversations_list.return_value = {
+            "channels": [
+                {"id": "C12345", "name": "general", "is_member": True}
+            ],
+            "response_metadata": {}
+        }
+        mock_client.conversations_history.return_value = {
+            "messages": [
+                {
+                    "ts": "1706500000.000000",
+                    "text": "Hey <@U12345> can you review this?",
+                    "user": "U67890"
+                }
+            ]
+        }
+        mock_client.users_info.return_value = {
+            "user": {"real_name": "John Doe", "name": "john"}
+        }
+
         ingester._client = mock_client
 
         mentions = ingester.get_recent_mentions(hours=24)
@@ -55,8 +71,11 @@ class TestSlackIngester:
         assert "review" in mentions[0]["text"]
         assert mentions[0]["channel_name"] == "general"
 
+    @patch('digiman.ingesters.slack.SLACK_BOT_TOKEN', None)
+    @patch('digiman.ingesters.slack.SLACK_USER_ID', None)
     def test_get_content_for_extraction(self):
         """Test content formatting for extraction."""
+        from digiman.ingesters.slack import SlackIngester
         ingester = SlackIngester(bot_token=None, user_id=None)
 
         mention = {

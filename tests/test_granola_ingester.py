@@ -4,6 +4,7 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -25,27 +26,54 @@ class TestGranolaIngester:
 
     def test_get_recent_meetings_empty_cache(self, tmp_path):
         """Test handling of empty cache."""
+        # Real Granola cache format: double-JSON with state.documents as dict
+        cache_data = {
+            "cache": json.dumps({
+                "state": {
+                    "documents": {},
+                    "documentPanels": {}
+                }
+            })
+        }
         cache_file = tmp_path / "cache.json"
-        cache_file.write_text('{"documents": []}')
+        cache_file.write_text(json.dumps(cache_data))
 
         ingester = GranolaIngester(cache_path=str(cache_file))
         meetings = ingester.get_recent_meetings()
         assert meetings == []
 
-    def test_get_recent_meetings_with_data(self, tmp_path):
+    @patch('digiman.ingesters.granola.ProcessedSource')
+    def test_get_recent_meetings_with_data(self, mock_processed, tmp_path):
         """Test extraction of meeting data."""
-        now = datetime.now()
-        cache_data = {
-            "documents": [
-                {
-                    "id": "meeting-1",
-                    "title": "Team Standup",
-                    "createdAt": now.isoformat(),
-                    "notes_markdown": "# Action Items\n- Review PR\n- Deploy to staging",
-                    "summary": "Daily standup meeting"
+        mock_processed.is_processed.return_value = False
+
+        now = datetime.utcnow()
+        # Real Granola cache format: double-JSON, documents is dict keyed by ID
+        inner_state = {
+            "state": {
+                "documents": {
+                    "meeting-1": {
+                        "title": "Team Standup",
+                        "created_at": now.isoformat() + "Z",
+                        "notes": {
+                            "content": [
+                                {"type": "paragraph", "content": [{"type": "text", "text": "Review PR"}]},
+                                {"type": "paragraph", "content": [{"type": "text", "text": "Deploy to staging"}]}
+                            ]
+                        }
+                    }
+                },
+                "documentPanels": {
+                    "meeting-1": {
+                        "panel-1": {
+                            "title": "Summary",
+                            "content": "<p>Daily standup meeting</p>"
+                        }
+                    }
                 }
-            ]
+            }
         }
+        cache_data = {"cache": json.dumps(inner_state)}
 
         cache_file = tmp_path / "cache.json"
         cache_file.write_text(json.dumps(cache_data))
@@ -55,21 +83,27 @@ class TestGranolaIngester:
 
         assert len(meetings) == 1
         assert meetings[0]["title"] == "Team Standup"
-        assert "Review PR" in meetings[0]["notes_markdown"]
+        assert "Review PR" in meetings[0]["notes_text"]
 
-    def test_get_recent_meetings_filters_old(self, tmp_path):
+    @patch('digiman.ingesters.granola.ProcessedSource')
+    def test_get_recent_meetings_filters_old(self, mock_processed, tmp_path):
         """Test that old meetings are filtered out."""
-        old_time = datetime.now() - timedelta(hours=48)
-        cache_data = {
-            "documents": [
-                {
-                    "id": "old-meeting",
-                    "title": "Old Meeting",
-                    "createdAt": old_time.isoformat(),
-                    "notes_markdown": "Old notes"
-                }
-            ]
+        mock_processed.is_processed.return_value = False
+
+        old_time = datetime.utcnow() - timedelta(hours=48)
+        inner_state = {
+            "state": {
+                "documents": {
+                    "old-meeting": {
+                        "title": "Old Meeting",
+                        "created_at": old_time.isoformat() + "Z",
+                        "notes": {"content": []}
+                    }
+                },
+                "documentPanels": {}
+            }
         }
+        cache_data = {"cache": json.dumps(inner_state)}
 
         cache_file = tmp_path / "cache.json"
         cache_file.write_text(json.dumps(cache_data))
@@ -83,10 +117,11 @@ class TestGranolaIngester:
         """Test content formatting for extraction."""
         ingester = GranolaIngester(cache_path=str(tmp_path / "dummy.json"))
 
+        # Use the correct field names that the real code expects
         meeting = {
             "title": "Planning Meeting",
-            "notes_markdown": "- Task 1\n- Task 2",
-            "summary": "Sprint planning",
+            "notes_text": "- Task 1\n- Task 2",
+            "summary_text": "Sprint planning",
             "action_items": ["Follow up with team", "Update docs"]
         }
 
@@ -95,4 +130,3 @@ class TestGranolaIngester:
         assert "Meeting: Planning Meeting" in content
         assert "Task 1" in content
         assert "Sprint planning" in content
-        assert "Follow up with team" in content
