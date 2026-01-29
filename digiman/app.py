@@ -1,17 +1,17 @@
 """Flask application for Digiman."""
 
-from datetime import date, datetime, timedelta
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from datetime import date, timedelta
+from flask import Flask, render_template, request, jsonify
 import calendar
 import json
 
 import os
 import subprocess
 from digiman.config import FLASK_SECRET_KEY, FLASK_DEBUG
+from digiman.models import Todo, init_db
 
 # Deploy webhook secret (set in environment)
 DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "")
-from digiman.models import Todo, init_db
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
@@ -26,7 +26,7 @@ def get_request_data():
     elif request.data:
         try:
             return json.loads(request.data)
-        except:
+        except (json.JSONDecodeError, ValueError):
             pass
     return {}
 
@@ -251,7 +251,7 @@ def api_reassign_todo(todo_id: int):
 def api_reorder_todos():
     """Reorder todos (for drag and drop)."""
     data = get_request_data()
-    order = data.get("order", [])  # List of todo IDs in new order
+    _ = data.get("order", [])  # List of todo IDs in new order (placeholder)
 
     # For now, we don't have a priority field, so this is a placeholder
     # Could add a 'priority' or 'sort_order' field to implement this
@@ -344,7 +344,7 @@ def status_page():
     if status_file.exists():
         try:
             cron_status = json.loads(status_file.read_text())
-        except:
+        except (json.JSONDecodeError, ValueError, OSError):
             pass
 
     return render_template("status.html", cron_status=cron_status, active_page="status")

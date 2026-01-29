@@ -90,7 +90,7 @@ def tiptap_to_text(content: Any) -> str:
             return ''.join(parts)
 
         return str(content) if content else ''
-    except Exception as e:
+    except Exception:
         return ''
 
 
@@ -150,7 +150,7 @@ class GranolaIngester:
 
                 if doc_time < cutoff:
                     continue
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 continue
 
             # Skip deleted docs

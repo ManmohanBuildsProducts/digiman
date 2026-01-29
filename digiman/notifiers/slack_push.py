@@ -1,6 +1,6 @@
 """Slack morning briefing push notification."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 from digiman.config import SLACK_BOT_TOKEN, SLACK_USER_ID
@@ -133,7 +133,7 @@ class SlackPusher:
                 mrkdwn=True
             )
 
-            print(f"✅ Morning briefing sent to Slack DM")
+            print("✅ Morning briefing sent to Slack DM")
             return True
 
         except Exception as e:

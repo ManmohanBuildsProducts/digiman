@@ -70,7 +70,7 @@ class SlackIngester:
             name = response.get("channel", {}).get("name", "Unknown")
             self._channel_cache[channel_id] = name
             return name
-        except:
+        except Exception:
             return "Unknown"
 
     def get_recent_mentions(self, hours: int = 24) -> List[Dict[str, Any]]:
@@ -137,7 +137,7 @@ class SlackIngester:
 
                         mentions.append(mention)
 
-                except Exception as e:
+                except Exception:
                     # Skip channels we can't read (permissions, etc)
                     continue
 
@@ -157,7 +157,7 @@ class SlackIngester:
             response = self.client.users_info(user=user_id)
             user = response.get("user", {})
             return user.get("real_name") or user.get("name") or user_id
-        except:
+        except Exception:
             return user_id
 
     def get_thread_context(self, channel_id: str, thread_ts: str, limit: int = 10) -> List[Dict[str, Any]]:
