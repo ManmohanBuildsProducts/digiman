@@ -165,8 +165,8 @@ class GranolaIngester:
             elif isinstance(notes, str):
                 notes_text = notes
 
-            # Get summary from panels
-            summary_text = ""
+            # Get summary from ALL summary panels (there can be multiple)
+            summary_parts = []
             doc_panels = panels.get(doc_id, {})
             for panel_id, panel in doc_panels.items():
                 if panel.get("title") == "Summary":
@@ -174,10 +174,14 @@ class GranolaIngester:
                     if content:
                         # Content can be HTML string or TipTap dict
                         if isinstance(content, str):
-                            summary_text = html_to_text(content)
+                            text = html_to_text(content)
                         elif isinstance(content, dict):
-                            summary_text = tiptap_to_text(content.get("content", []))
-                    break
+                            text = tiptap_to_text(content.get("content", []))
+                        else:
+                            text = ""
+                        if text and text.strip():
+                            summary_parts.append(text.strip())
+            summary_text = "\n\n".join(summary_parts)
 
             # Extract action-item-like lines from summary
             action_items = self._extract_action_items(summary_text)

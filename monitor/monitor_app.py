@@ -102,6 +102,32 @@ DASHBOARD_HTML = """
             </div>
         </div>
 
+        <!-- Upcoming Schedule -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-5 mb-8">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                    <i data-lucide="calendar-clock" class="w-5 h-5 text-orange-400"></i>
+                </div>
+                <h2 class="font-bold text-lg">Upcoming Schedule</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg">
+                    <span class="text-2xl">📝</span>
+                    <div>
+                        <div class="text-sm text-gray-400">Nightly Sync</div>
+                        <div class="font-medium" x-text="status.next_nightly_sync || 'Not scheduled'"></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg">
+                    <span class="text-2xl">🌅</span>
+                    <div>
+                        <div class="text-sm text-gray-400">Morning Push</div>
+                        <div class="font-medium" x-text="status.next_morning_push || 'Not scheduled'"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Jobs -->
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-8">
             <div class="p-4 border-b border-gray-700">
@@ -278,6 +304,11 @@ def api_status():
         except:
             status['last_sync_ago'] = 'Unknown'
 
+    # Add upcoming schedule
+    next_sync, next_push = get_next_scheduled_times()
+    status['next_nightly_sync'] = next_sync
+    status['next_morning_push'] = next_push
+
     return jsonify(status)
 
 @flask_app.route('/api/run/<job_id>', methods=['POST'])
@@ -338,6 +369,34 @@ def time_ago(dt):
         return f"{days}d ago"
 
 
+def get_next_scheduled_times():
+    """Calculate next scheduled sync times."""
+    from datetime import timedelta
+
+    now = datetime.now()
+
+    # Nightly sync at 11 PM
+    nightly = now.replace(hour=23, minute=0, second=0, microsecond=0)
+    if now >= nightly:
+        nightly += timedelta(days=1)
+
+    # Morning push at 8 AM
+    morning = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if now >= morning:
+        morning += timedelta(days=1)
+
+    # Format nicely
+    def format_time(dt):
+        if dt.date() == now.date():
+            return f"Today {dt.strftime('%I:%M %p')}"
+        elif dt.date() == (now + timedelta(days=1)).date():
+            return f"Tomorrow {dt.strftime('%I:%M %p')}"
+        else:
+            return dt.strftime('%b %d %I:%M %p')
+
+    return format_time(nightly), format_time(morning)
+
+
 class DigimanMonitor(rumps.App):
     def __init__(self):
         super().__init__("Monitor", title="⚡", quit_button=None)
@@ -371,6 +430,14 @@ class DigimanMonitor(rumps.App):
         else:
             self.title = "⚡"
             self.menu.add(rumps.MenuItem("No syncs yet", callback=None))
+
+        self.menu.add(None)
+
+        # Upcoming schedule
+        next_sync, next_push = get_next_scheduled_times()
+        self.menu.add(rumps.MenuItem("📅 Upcoming Schedule", callback=None))
+        self.menu.add(rumps.MenuItem(f"   📝 Nightly Sync: {next_sync}", callback=None))
+        self.menu.add(rumps.MenuItem(f"   🌅 Morning Push: {next_push}", callback=None))
 
         self.menu.add(None)
         self.menu.add(rumps.MenuItem("📊 Open Dashboard", callback=self.open_dashboard))
