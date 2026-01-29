@@ -2,45 +2,22 @@ name: Health Check
 
 on:
   schedule:
-    # Every 15 minutes
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   health-check:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check site health
-        id: health
         run: |
-          SITE_URL="https://manmohanbuildsproducts.pythonanywhere.com"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://manmohanbuildsproducts.pythonanywhere.com")
 
-          echo "Checking $SITE_URL..."
-
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" --max-time 30 "$SITE_URL" || echo "000")
-
-          echo "status=$HTTP_CODE" >> $GITHUB_OUTPUT
-
-          if [ "$HTTP_CODE" = "200" ]; then
+          if [ "$STATUS" = "200" ]; then
             echo "✅ Site is UP"
           else
-            echo "🚨 Site is DOWN! Status: $HTTP_CODE"
-            cat /tmp/response.txt || true
+            echo "🚨 Site is DOWN! Status: $STATUS"
+            # Send push notification via ntfy.sh (free, no signup)
+            curl -d "Digiman DOWN! Status: $STATUS. Run: digiman-check" ntfy.sh/digiman-alerts
             exit 1
           fi
-
-      - name: Trigger Claude Code debugger on failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'auto-debug.yml',
-              ref: 'main',
-              inputs: {
-                error_context: 'Site returned status ${{ steps.health.outputs.status }}'
-              }
-            })
