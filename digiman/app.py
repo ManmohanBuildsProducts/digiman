@@ -365,6 +365,33 @@ def api_discard_suggestion(suggestion_id: int):
     return jsonify({"success": True})
 
 
+@app.route("/api/suggestions/cleanup", methods=["POST"])
+def api_cleanup_suggestions():
+    """Remove duplicate suggestions, keeping only the most recent."""
+    token = request.headers.get("X-Deploy-Token") or request.args.get("token")
+    if not DEPLOY_SECRET or token != DEPLOY_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from digiman.models import get_db
+
+    with get_db() as conn:
+        # Find duplicates by title and source_type, keep the one with lowest ID
+        cursor = conn.execute("""
+            DELETE FROM todos
+            WHERE is_suggestion = 1
+            AND id NOT IN (
+                SELECT MIN(id)
+                FROM todos
+                WHERE is_suggestion = 1
+                GROUP BY title, source_type
+            )
+        """)
+        deleted = cursor.rowcount
+        conn.commit()
+
+    return jsonify({"success": True, "deleted": deleted})
+
+
 @app.route("/api/suggestions/import", methods=["POST"])
 def api_import_suggestions():
     """Bulk import suggestions (for syncing from local to remote)."""
