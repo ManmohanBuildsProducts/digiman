@@ -263,6 +263,17 @@
                                   {% if active_page == 'today' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
                             Today
                         </a>
+                        <a href="/inbox"
+                           class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5
+                                  {% if active_page == 'inbox' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                            Inbox
+                            {% if suggestion_count and suggestion_count > 0 %}
+                            <span class="px-1.5 py-0.5 text-xs font-bold rounded-full
+                                {% if active_page == 'inbox' %}bg-white text-gray-900{% else %}bg-amber-500 text-white{% endif %}">
+                                {{ suggestion_count }}
+                            </span>
+                            {% endif %}
+                        </a>
                         <a href="/calendar"
                            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
                                   {% if active_page == 'calendar' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">

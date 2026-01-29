@@ -37,6 +37,16 @@ def ensure_db():
     init_db()
 
 
+@app.context_processor
+def inject_suggestion_count():
+    """Inject suggestion count into all templates for nav badge."""
+    try:
+        suggestions = Todo.get_suggestions()
+        return {"suggestion_count": len(suggestions)}
+    except:
+        return {"suggestion_count": 0}
+
+
 # ============== Page Routes ==============
 
 @app.route("/")
@@ -55,6 +65,29 @@ def index():
         today=today,
         week_str=week_str,
         active_page="today"
+    )
+
+
+@app.route("/inbox")
+def inbox():
+    """Inbox view - triage suggestions from Granola/Slack."""
+    suggestions = Todo.get_suggestions()
+    today = date.today()
+    current_week = today.isocalendar()
+    week_str = f"{current_week[0]}-W{current_week[1]:02d}"
+
+    # Group suggestions by source
+    granola_suggestions = [s for s in suggestions if s.source_type == "granola"]
+    slack_suggestions = [s for s in suggestions if s.source_type == "slack"]
+
+    return render_template(
+        "inbox.html",
+        suggestions=suggestions,
+        granola_suggestions=granola_suggestions,
+        slack_suggestions=slack_suggestions,
+        today=today,
+        week_str=week_str,
+        active_page="inbox"
     )
 
 
