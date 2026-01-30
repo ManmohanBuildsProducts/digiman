@@ -445,20 +445,56 @@ def api_import_suggestions():
 
 # ============== System Status ==============
 
+# In-memory status storage (will be replaced by database in production)
+_monitoring_status = {}
+
 @app.route("/status")
 def status_page():
-    """System status dashboard."""
-    from pathlib import Path
+    """System status dashboard (Monitoring tab)."""
+    global _monitoring_status
 
-    status_file = Path.home() / ".digiman" / "cron_status.json"
-    cron_status = {}
-    if status_file.exists():
-        try:
-            cron_status = json.loads(status_file.read_text())
-        except (json.JSONDecodeError, ValueError, OSError):
-            pass
+    # Use synced status from API if available, otherwise try local file
+    cron_status = _monitoring_status.copy() if _monitoring_status else {}
+
+    # Fallback to local file (for local development)
+    if not cron_status:
+        from pathlib import Path
+        status_file = Path.home() / ".digiman" / "cron_status.json"
+        if status_file.exists():
+            try:
+                cron_status = json.loads(status_file.read_text())
+            except (json.JSONDecodeError, ValueError, OSError):
+                pass
 
     return render_template("status.html", cron_status=cron_status, active_page="status")
+
+
+@app.route("/api/monitoring/status", methods=["GET"])
+def api_get_monitoring_status():
+    """Get current monitoring status."""
+    global _monitoring_status
+    return jsonify(_monitoring_status)
+
+
+@app.route("/api/monitoring/status", methods=["POST"])
+def api_update_monitoring_status():
+    """Receive monitoring status update from local machine."""
+    global _monitoring_status
+
+    # Verify deploy token for security
+    token = request.headers.get("X-Deploy-Token") or request.args.get("token")
+    if not DEPLOY_SECRET or token != DEPLOY_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = get_request_data()
+
+    # Merge the incoming status with existing
+    # This allows partial updates
+    if data:
+        _monitoring_status.update(data)
+        _monitoring_status["last_synced_from_local"] = date.today().isoformat()
+
+    return jsonify({"success": True, "status": _monitoring_status})
 
 
 # ============== HTMX Partials ==============

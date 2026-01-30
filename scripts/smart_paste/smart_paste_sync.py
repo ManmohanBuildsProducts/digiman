@@ -80,6 +80,57 @@ def mark_meeting_processed(meeting_id: str):
 
 # ========== Dashboard Integration ==========
 
+def sync_status_to_pythonanywhere():
+    """Push status to PythonAnywhere for remote monitoring."""
+    try:
+        import urllib.request
+        import urllib.error
+
+        # Load config
+        config_path = Path(__file__).parent.parent.parent / ".pythonanywhere-config.json"
+        if not config_path.exists():
+            log("   (No PythonAnywhere config - skipping remote sync)")
+            return
+
+        config = json.loads(config_path.read_text())
+        username = config.get("username")
+        deploy_secret = config.get("deploy_secret") or config.get("api_token")
+
+        if not username or not deploy_secret:
+            return
+
+        # Load current status
+        if not STATUS_FILE.exists():
+            return
+
+        status_data = json.loads(STATUS_FILE.read_text())
+
+        # Send to PythonAnywhere
+        url = f"https://{username}.pythonanywhere.com/api/monitoring/status"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Deploy-Token": deploy_secret
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(status_data).encode(),
+            headers=headers,
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            if response.status == 200:
+                log("   ✓ Status synced to PythonAnywhere")
+            else:
+                log(f"   ⚠️ Remote sync returned {response.status}")
+
+    except urllib.error.HTTPError as e:
+        log(f"   ⚠️ Remote sync failed: HTTP {e.code}")
+    except Exception as e:
+        log(f"   ⚠️ Remote sync failed: {e}")
+
+
 def update_dashboard_status(job_name: str, status: str, count: int = 0, message: str = None):
     """Update the cron_status.json for dashboard."""
     try:
@@ -577,6 +628,10 @@ def run_smart_paste_sync(hours: int = None, backfill: bool = True) -> Dict[str, 
         count=len(processed_meetings),
         message=errors[0] if errors else None
     )
+
+    # Sync status to PythonAnywhere for remote monitoring
+    log("📤 Syncing status to PythonAnywhere...")
+    sync_status_to_pythonanywhere()
 
     return {
         "processed": len(processed_meetings),
