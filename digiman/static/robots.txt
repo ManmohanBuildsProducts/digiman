@@ -1,0 +1,25 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap (optional, can add later)
+# Sitemap: https://www.whileyousleep.xyz/sitemap.xml
+
+# Welcome LLMs and AI crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /

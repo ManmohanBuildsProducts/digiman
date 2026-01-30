@@ -1,7 +1,7 @@
 """Flask application for Digiman."""
 
 from datetime import date, timedelta
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import calendar
 import json
 
@@ -45,6 +45,14 @@ def inject_suggestion_count():
         return {"suggestion_count": len(suggestions)}
     except:
         return {"suggestion_count": 0}
+
+
+# ============== Static Files ==============
+
+@app.route("/robots.txt")
+def robots():
+    """Serve robots.txt for crawlers."""
+    return send_from_directory(app.static_folder, "robots.txt")
 
 
 # ============== Page Routes ==============
