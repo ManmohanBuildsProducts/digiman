@@ -3,7 +3,7 @@
 
 cd "$(dirname "$0")/.." || exit 1
 
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://manmohanbuildsproducts.pythonanywhere.com")
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://www.whileyousleep.xyz")
 
 if [ "$STATUS" = "200" ]; then
     echo "✅ Site is UP"

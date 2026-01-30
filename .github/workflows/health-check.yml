@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Check site health
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://manmohanbuildsproducts.pythonanywhere.com")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://www.whileyousleep.xyz")
 
           if [ "$STATUS" = "200" ]; then
             echo "✅ Site is UP"
