@@ -173,6 +173,126 @@ class SlackIngester:
             print(f"⚠️  Error fetching thread context: {e}")
             return []
 
+    def get_surrounding_messages(self, channel_id: str, message_ts: str, before: int = 3, after: int = 3) -> List[Dict[str, Any]]:
+        """Get messages surrounding a specific message in a channel.
+
+        Args:
+            channel_id: The channel ID
+            message_ts: Timestamp of the target message
+            before: Number of messages before the target
+            after: Number of messages after the target
+
+        Returns:
+            List of messages in chronological order
+        """
+        try:
+            # Get messages including and before the target
+            response_before = self.client.conversations_history(
+                channel=channel_id,
+                latest=message_ts,
+                limit=before + 1,  # +1 to include the target message
+                inclusive=True
+            )
+            messages_before = response_before.get("messages", [])
+
+            # Get messages after the target
+            response_after = self.client.conversations_history(
+                channel=channel_id,
+                oldest=message_ts,
+                limit=after + 1,  # +1 because oldest is inclusive
+                inclusive=False
+            )
+            messages_after = response_after.get("messages", [])
+
+            # Combine and sort by timestamp
+            all_messages = messages_before + messages_after
+            # Remove duplicates based on ts
+            seen = set()
+            unique_messages = []
+            for msg in all_messages:
+                ts = msg.get("ts")
+                if ts and ts not in seen:
+                    seen.add(ts)
+                    unique_messages.append(msg)
+
+            # Sort chronologically (oldest first)
+            unique_messages.sort(key=lambda x: float(x.get("ts", 0)))
+
+            return unique_messages
+
+        except Exception as e:
+            print(f"⚠️  Error fetching surrounding messages: {e}")
+            return []
+
+    def get_full_context(self, mention: Dict[str, Any]) -> str:
+        """Get full context for a mention - thread or surrounding messages.
+
+        Args:
+            mention: The mention dict from get_recent_mentions()
+
+        Returns:
+            Formatted string with full context for AI extraction
+        """
+        parts = []
+        parts.append(f"Channel: #{mention.get('channel_name', 'unknown')}")
+        parts.append(f"From: @{mention.get('username', 'unknown')}")
+        parts.append("")
+
+        channel_id = mention.get("channel_id")
+        thread_ts = mention.get("thread_ts")
+        message_ts = mention.get("id", "").split("_")[-1] if mention.get("id") else None
+
+        if thread_ts and channel_id:
+            # It's a thread - get full thread context
+            parts.append("## Thread Context")
+            thread_messages = self.get_thread_context(channel_id, thread_ts, limit=15)
+
+            for msg in thread_messages:
+                user_id = msg.get("user", "")
+                username = self._get_username(user_id) if user_id else "unknown"
+                text = msg.get("text", "")
+                # Clean up Slack formatting
+                text = self._clean_slack_text(text)
+                parts.append(f"@{username}: {text}")
+            parts.append("")
+
+        elif channel_id and message_ts:
+            # It's a channel message - get surrounding context
+            parts.append("## Channel Context (surrounding messages)")
+            surrounding = self.get_surrounding_messages(channel_id, message_ts, before=3, after=3)
+
+            for msg in surrounding:
+                user_id = msg.get("user", "")
+                username = self._get_username(user_id) if user_id else "unknown"
+                text = msg.get("text", "")
+                # Clean up Slack formatting
+                text = self._clean_slack_text(text)
+                # Mark the target message
+                is_target = msg.get("ts") == message_ts
+                prefix = ">>> " if is_target else ""
+                parts.append(f"{prefix}@{username}: {text}")
+            parts.append("")
+        else:
+            # Fallback - just the message
+            parts.append("## Message")
+            parts.append(mention.get("text", ""))
+            parts.append("")
+
+        return "\n".join(parts)
+
+    def _clean_slack_text(self, text: str) -> str:
+        """Clean Slack formatting from text."""
+        import re
+        # Remove user mentions like <@U123>
+        cleaned = re.sub(r'<@[A-Z0-9]+>', '@user', text)
+        # Convert channel links
+        cleaned = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', cleaned)
+        # Convert URL links with text
+        cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', cleaned)
+        # Convert plain URLs
+        cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)
+        return cleaned
+
     def get_content_for_extraction(self, mention: Dict[str, Any]) -> str:
         """Get content from a mention for action extraction."""
         parts = []

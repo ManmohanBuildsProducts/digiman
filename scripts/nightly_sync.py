@@ -15,6 +15,7 @@ STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
 from digiman.ingesters.meeting_archive import MeetingArchiveIngester
+from digiman.extractors import ActionExtractor
 
 
 def clean_text(text: str) -> str:
@@ -173,46 +174,107 @@ def run_sync(hours: int = 24) -> dict:
         mentions = slack.get_recent_mentions(hours=hours)
         print(f"   Found {len(mentions)} new mentions")
 
+        # Initialize extractor for AI-powered extraction
+        extractor = ActionExtractor()
+        use_ai_extraction = bool(extractor.api_key)
+        if use_ai_extraction:
+            print("   🤖 AI extraction enabled (Claude API)")
+        else:
+            print("   ⚠️  No API key - falling back to raw capture")
+
         for mention in mentions:
             try:
-                # Create SUGGESTION from mention text
-                text = mention.get("text", "")
-                if not text.strip():
-                    continue
+                channel_name = mention.get('channel_name', 'unknown')
+                is_thread = bool(mention.get("thread_ts"))
+                context_type = "thread" if is_thread else "channel"
 
-                # Clean up Slack formatting (remove user IDs like <@U123>)
-                import re
-                cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
-                cleaned = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', cleaned)  # Channel links
-                cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', cleaned)  # URL links
-                cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)  # Plain URLs
+                if use_ai_extraction:
+                    # Get full context (thread or surrounding messages)
+                    full_context = slack.get_full_context(mention)
 
-                title = clean_text(cleaned)
+                    if not full_context.strip():
+                        continue
 
-                if not title or len(title) < 5:
-                    continue
+                    # Extract action items using Claude
+                    action_items = extractor.extract(full_context, source_type="slack")
 
-                # Prefix with username if available
-                username = mention.get("username", "")
-                if username:
-                    title = f"@{username}: {title}"
+                    if action_items:
+                        # Create suggestions from extracted action items
+                        for item in action_items:
+                            title = clean_text(item.get("title", ""))
+                            if not title or len(title) < 5:
+                                continue
 
-                suggestion = Todo(
-                    title=title,
-                    source_type="slack",
-                    source_id=mention["id"],
-                    source_context=f"#{mention.get('channel_name', 'unknown')}",
-                    source_url=mention.get("permalink"),
-                    is_suggestion=True,  # Mark as suggestion, not todo
-                )
-                suggestion.save()
-                stats["slack_extracted"] += 1
+                            suggestion = Todo(
+                                title=title,
+                                source_type="slack",
+                                source_id=mention["id"],
+                                source_context=f"#{channel_name}",
+                                source_url=mention.get("permalink"),
+                                is_suggestion=True,
+                                extraction_confidence=item.get("confidence", 0.8)
+                            )
+                            suggestion.save()
+                            stats["slack_extracted"] += 1
+
+                        print(f"   ✓ #{channel_name} ({context_type}): {len(action_items)} action items extracted")
+                    else:
+                        # No action items extracted - create a review suggestion
+                        text = mention.get("text", "")
+                        import re
+                        cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
+                        cleaned = clean_text(cleaned)[:100]
+
+                        username = mention.get("username", "")
+                        title = f"Review @{username}: {cleaned}" if username else f"Review: {cleaned}"
+
+                        suggestion = Todo(
+                            title=title,
+                            source_type="slack",
+                            source_id=mention["id"],
+                            source_context=f"#{channel_name}",
+                            source_url=mention.get("permalink"),
+                            is_suggestion=True,
+                        )
+                        suggestion.save()
+                        stats["slack_extracted"] += 1
+                        print(f"   ○ #{channel_name} ({context_type}): no actions found, created review suggestion")
+
+                else:
+                    # Fallback: Raw capture without AI (original behavior)
+                    text = mention.get("text", "")
+                    if not text.strip():
+                        continue
+
+                    import re
+                    cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
+                    cleaned = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', cleaned)
+                    cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', cleaned)
+                    cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)
+
+                    title = clean_text(cleaned)
+                    if not title or len(title) < 5:
+                        continue
+
+                    username = mention.get("username", "")
+                    if username:
+                        title = f"@{username}: {title}"
+
+                    suggestion = Todo(
+                        title=title,
+                        source_type="slack",
+                        source_id=mention["id"],
+                        source_context=f"#{channel_name}",
+                        source_url=mention.get("permalink"),
+                        is_suggestion=True,
+                    )
+                    suggestion.save()
+                    stats["slack_extracted"] += 1
+                    print(f"   ✓ #{channel_name}: captured raw suggestion")
 
                 # Mark as processed
                 slack.mark_processed(mention["id"])
                 stats["slack_processed"] += 1
-
-                print(f"   ✓ #{mention.get('channel_name')}: captured suggestion")
 
             except Exception as e:
                 error = f"Error processing mention {mention.get('id')}: {e}"
