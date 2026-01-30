@@ -28,6 +28,84 @@ def get_request_data():
             return json.loads(request.data)
         except (json.JSONDecodeError, ValueError):
             pass
+
+
+import re
+
+def should_reject_suggestion(title: str, description: str = None) -> tuple[bool, str]:
+    """
+    Filter out non-actionable suggestions before import.
+
+    Returns:
+        (should_reject: bool, reason: str)
+    """
+    if not title:
+        return True, "empty_title"
+
+    title_lower = title.lower().strip()
+    desc_lower = (description or "").lower().strip()
+    combined = f"{title_lower} {desc_lower}"
+
+    # 1. Test/placeholder items
+    test_patterns = [
+        r'^test\s',
+        r'^suggestion\s*\d*$',
+        r'^suggestion item',
+        r'^follow up on project$',  # Too vague
+        r'^imported suggestion$',
+    ]
+    for pattern in test_patterns:
+        if re.match(pattern, title_lower):
+            return True, "test_placeholder"
+
+    # 2. Sick leave / OOO / status updates (not actionable for recipient)
+    status_patterns = [
+        r'(fever|sick|ill|unwell|body ache|not feeling well)',
+        r'(leave|on leave|taking leave|will be on leave)',
+        r'(ooo|out of office|working from home|wfh today)',
+        r'(will resume|will be back|back tomorrow)',
+        r'(holiday|vacation|pto)',
+    ]
+    for pattern in status_patterns:
+        if re.search(pattern, combined):
+            return True, "status_update"
+
+    # 3. Simple questions (not tasks)
+    simple_question_patterns = [
+        r'^@?\w+:?\s*(joining\??|available\??|free\??|there\??)$',
+        r'^(joining|available|free|there)\??$',
+        r'are you (available|free|joining|there)',
+        r'can (you|we) (join|sync|meet|talk)',
+    ]
+    for pattern in simple_question_patterns:
+        if re.search(pattern, title_lower):
+            return True, "simple_question"
+
+    # 4. Past meeting requests (with specific times/dates that have passed)
+    # These often contain "today" or specific times
+    meeting_request_patterns = [
+        r'(between|from)\s+\d{1,2}[:\-]\d{2}\s*(am|pm|to)',
+        r'(4-5|5-6|6-7|3-4)\s*pm\s*(today)?',
+        r'sync (today|now|at \d)',
+    ]
+    for pattern in meeting_request_patterns:
+        if re.search(pattern, title_lower):
+            return True, "meeting_request"
+
+    # 5. FYI/informational messages (no action required)
+    fyi_patterns = [
+        r'^(fyi|heads up|just so you know|letting you know)',
+        r'(for your (info|information|reference|awareness))',
+    ]
+    for pattern in fyi_patterns:
+        if re.search(pattern, title_lower):
+            return True, "fyi_message"
+
+    # 6. Too short to be actionable (likely noise)
+    if len(title) < 10:
+        return True, "too_short"
+
+    return False, ""
     return {}
 
 
@@ -423,6 +501,8 @@ def api_import_suggestions():
 
     imported = 0
     skipped = 0
+    rejected = 0
+    rejection_reasons = {}
 
     for item in suggestions_data:
         # Skip if already exists (by source_id)
@@ -432,6 +512,18 @@ def api_import_suggestions():
             if ProcessedSource.is_processed(item.get("source_type", "manual"), source_id):
                 skipped += 1
                 continue
+
+        # Filter out non-actionable suggestions
+        title = item.get("title", "")
+        description = item.get("description", "")
+        should_reject, reason = should_reject_suggestion(title, description)
+        if should_reject:
+            rejected += 1
+            rejection_reasons[reason] = rejection_reasons.get(reason, 0) + 1
+            # Still mark as processed so we don't try again
+            if source_id:
+                ProcessedSource.mark_processed(item.get("source_type", "manual"), source_id)
+            continue
 
         todo = Todo(
             title=item.get("title", "Imported suggestion"),
@@ -454,7 +546,9 @@ def api_import_suggestions():
     return jsonify({
         "success": True,
         "imported": imported,
-        "skipped": skipped
+        "skipped": skipped,
+        "rejected": rejected,
+        "rejection_reasons": rejection_reasons
     })
 
 
