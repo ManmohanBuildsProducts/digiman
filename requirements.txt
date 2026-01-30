@@ -1,6 +1,7 @@
 flask==3.0.0
 python-dotenv==1.0.0
 slack-sdk==3.27.0
+gunicorn==21.2.0
 
 # Testing
 pytest>=8.0.0
