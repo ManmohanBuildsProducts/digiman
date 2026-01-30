@@ -276,7 +276,7 @@ DASHBOARD_HTML = """
         <!-- Footer with log file paths -->
         <div class="mt-6 text-center text-xs text-gray-600">
             Logs: ~/.digiman/logs/ · Dashboard: localhost:5051 ·
-            <a href="https://manmohanbuildsproducts.pythonanywhere.com" target="_blank" class="text-gray-500 hover:text-gray-400">Open Digiman →</a>
+            <a href="https://www.whileyousleep.xyz" target="_blank" class="text-gray-500 hover:text-gray-400">Open Digiman →</a>
         </div>
 
         <!-- Toast -->
@@ -299,7 +299,7 @@ DASHBOARD_HTML = """
                     jobs: [
                         { id: 'smart_paste', name: 'SMART_PASTE', description: 'Process meetings via Claude Code', icon: '🧠', status: 'pending', last_run: null, running: false, schedule: '1:30 AM' },
                         { id: 'watchdog', name: 'Watchdog', description: 'Ensures sync completes', icon: '🐕', status: 'active', last_run: null, running: false, schedule: 'Every 15 min' },
-                        { id: 'nightly', name: 'Nightly Sync', description: 'Extract action items to Digiman', icon: '📝', status: 'pending', last_run: null, running: false, schedule: '2:00 AM' },
+                        { id: 'nightly', name: 'Nightly Sync', description: 'Extract action items to Digiman', icon: '📝', status: 'pending', last_run: null, running: false, schedule: '1:30 AM' },
                         { id: 'morning_push', name: 'Morning Push', description: 'Send daily todos to Slack', icon: '🌅', status: 'pending', last_run: null, running: false, schedule: '8:00 AM' }
                     ],
                     history: [],
@@ -647,8 +647,8 @@ def get_next_scheduled_times():
     if now >= smart_paste:
         smart_paste += timedelta(days=1)
 
-    # Nightly sync at 2:00 AM
-    nightly = now.replace(hour=2, minute=0, second=0, microsecond=0)
+    # Nightly sync at 1:30 AM
+    nightly = now.replace(hour=1, minute=30, second=0, microsecond=0)
     if now >= nightly:
         nightly += timedelta(days=1)
 
@@ -730,7 +730,7 @@ class DigimanMonitor(rumps.App):
         webbrowser.open(f"http://localhost:{MONITOR_PORT}")
 
     def open_digiman(self, _):
-        webbrowser.open("https://manmohanbuildsproducts.pythonanywhere.com")
+        webbrowser.open("https://www.whileyousleep.xyz")
 
     def run_smart_paste(self, _):
         rumps.notification("Digiman Monitor", "Starting SMART_PASTE...", "Processing meetings via Claude Code")

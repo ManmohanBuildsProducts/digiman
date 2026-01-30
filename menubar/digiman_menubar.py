@@ -7,7 +7,7 @@ import webbrowser
 from datetime import date, timedelta
 
 # Configuration
-API_BASE = "https://manmohanbuildsproducts.pythonanywhere.com"
+API_BASE = "https://www.whileyousleep.xyz"
 
 
 class DigimanMenuBar(rumps.App):
