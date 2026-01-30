@@ -113,7 +113,7 @@
         </div>
         <div class="divide-y divide-gray-100">
             <!-- SMART_PASTE -->
-            {% set sp = cron_status.jobs.smart_paste if cron_status.jobs else {} %}
+            {% set sp = cron_status.get('jobs', {}).get('smart_paste', {}) if cron_status else {} %}
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
@@ -134,7 +134,7 @@
             </div>
 
             <!-- Watchdog -->
-            {% set wd = cron_status.jobs.watchdog if cron_status.jobs else {} %}
+            {% set wd = cron_status.get('jobs', {}).get('watchdog', {}) if cron_status else {} %}
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
@@ -155,7 +155,7 @@
             </div>
 
             <!-- Nightly Sync -->
-            {% set ns = cron_status.jobs.nightly_sync if cron_status.jobs else {} %}
+            {% set ns = cron_status.get('jobs', {}).get('nightly_sync', {}) if cron_status else {} %}
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
@@ -176,7 +176,7 @@
             </div>
 
             <!-- Morning Push -->
-            {% set mp = cron_status.jobs.morning_push if cron_status.jobs else {} %}
+            {% set mp = cron_status.get('jobs', {}).get('morning_push', {}) if cron_status else {} %}
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
