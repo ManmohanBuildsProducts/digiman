@@ -293,6 +293,72 @@ class SlackIngester:
         cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)
         return cleaned
 
+    def extract_action_items(self, context: str) -> List[str]:
+        """Extract action items from Slack context using regex patterns.
+
+        Similar to Granola's extraction - no API needed.
+        """
+        import re
+
+        if not context:
+            return []
+
+        # Skip these generic phrases
+        skip_patterns = [
+            r'^(hi|hello|hey|thanks|thank you|ok|okay|sure|yes|no|np|sounds good)$',
+        ]
+
+        # Action patterns - things that look like requests/tasks
+        action_patterns = [
+            # Direct requests with "can you", "could you", "please"
+            r'(?:can you|could you|would you|please)\s+(\S.{10,})',
+            # Action verbs directed at someone
+            r'(?:^|\s)(?:review|check|look at|update|fix|send|share|create|prepare|schedule|follow up|sync|coordinate|finalize|approve|submit|test|deploy|document|implement|add|remove|change|set up)\s+(\S.{5,})',
+            # Questions that imply action
+            r'(?:can we|should we|shall we)\s+(\S.{10,})',
+            # Deadline mentions
+            r'(.{10,})\s+(?:by|before|until)\s+(?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|EOD|end of day|end of week)',
+            # Explicit task markers
+            r'(?:TODO|Action item|Task|Need to|Have to)[:.]?\s+(\S.{5,})',
+        ]
+
+        items = []
+        lines = context.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if not line or len(line) < 15:
+                continue
+
+            # Skip generic phrases
+            clean_line = line.lstrip('- @').strip()
+            skip = False
+            for skip_pat in skip_patterns:
+                if re.match(skip_pat, clean_line, re.IGNORECASE):
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            # Check for action patterns
+            for pattern in action_patterns:
+                match = re.search(pattern, line, re.IGNORECASE)
+                if match:
+                    # Get the matched action or full line
+                    item = match.group(1) if match.groups() else line
+                    item = item.strip()
+                    # Clean up
+                    item = re.sub(r'^[?\-\s]+', '', item)
+                    item = item.strip('?.,!').strip()
+
+                    if item and len(item) > 10 and item not in items:
+                        # Capitalize first letter
+                        item = item[0].upper() + item[1:] if len(item) > 1 else item.upper()
+                        items.append(item)
+                    break
+
+        return items[:5]  # Max 5 action items
+
     def get_content_for_extraction(self, mention: Dict[str, Any]) -> str:
         """Get content from a mention for action extraction."""
         parts = []

@@ -15,7 +15,6 @@ STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
 from digiman.ingesters.meeting_archive import MeetingArchiveIngester
-from digiman.extractors import ActionExtractor
 
 
 def clean_text(text: str) -> str:
@@ -173,14 +172,7 @@ def run_sync(hours: int = 24) -> dict:
     try:
         mentions = slack.get_recent_mentions(hours=hours)
         print(f"   Found {len(mentions)} new mentions")
-
-        # Initialize extractor for AI-powered extraction
-        extractor = ActionExtractor()
-        use_ai_extraction = bool(extractor.api_key)
-        if use_ai_extraction:
-            print("   🤖 AI extraction enabled (Claude API)")
-        else:
-            print("   ⚠️  No API key - falling back to raw capture")
+        print("   📝 Using regex-based extraction (no API needed)")
 
         for mention in mentions:
             try:
@@ -188,45 +180,21 @@ def run_sync(hours: int = 24) -> dict:
                 is_thread = bool(mention.get("thread_ts"))
                 context_type = "thread" if is_thread else "channel"
 
-                if use_ai_extraction:
-                    # Get full context (thread or surrounding messages)
-                    full_context = slack.get_full_context(mention)
+                # Get full context (thread or surrounding messages)
+                full_context = slack.get_full_context(mention)
 
-                    if not full_context.strip():
-                        continue
+                if not full_context.strip():
+                    continue
 
-                    # Extract action items using Claude
-                    action_items = extractor.extract(full_context, source_type="slack")
+                # Extract action items using regex patterns (like Granola)
+                action_items = slack.extract_action_items(full_context)
 
-                    if action_items:
-                        # Create suggestions from extracted action items
-                        for item in action_items:
-                            title = clean_text(item.get("title", ""))
-                            if not title or len(title) < 5:
-                                continue
-
-                            suggestion = Todo(
-                                title=title,
-                                source_type="slack",
-                                source_id=mention["id"],
-                                source_context=f"#{channel_name}",
-                                source_url=mention.get("permalink"),
-                                is_suggestion=True,
-                                extraction_confidence=item.get("confidence", 0.8)
-                            )
-                            suggestion.save()
-                            stats["slack_extracted"] += 1
-
-                        print(f"   ✓ #{channel_name} ({context_type}): {len(action_items)} action items extracted")
-                    else:
-                        # No action items extracted - create a review suggestion
-                        text = mention.get("text", "")
-                        import re
-                        cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
-                        cleaned = clean_text(cleaned)[:100]
-
-                        username = mention.get("username", "")
-                        title = f"Review @{username}: {cleaned}" if username else f"Review: {cleaned}"
+                if action_items:
+                    # Create suggestions from extracted action items
+                    for item in action_items:
+                        title = clean_text(item)
+                        if not title or len(title) < 5:
+                            continue
 
                         suggestion = Todo(
                             title=title,
@@ -238,27 +206,17 @@ def run_sync(hours: int = 24) -> dict:
                         )
                         suggestion.save()
                         stats["slack_extracted"] += 1
-                        print(f"   ○ #{channel_name} ({context_type}): no actions found, created review suggestion")
 
+                    print(f"   ✓ #{channel_name} ({context_type}): {len(action_items)} action items extracted")
                 else:
-                    # Fallback: Raw capture without AI (original behavior)
+                    # No action items found - create a review suggestion
                     text = mention.get("text", "")
-                    if not text.strip():
-                        continue
-
                     import re
                     cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
-                    cleaned = re.sub(r'<#[A-Z0-9]+\|([^>]+)>', r'#\1', cleaned)
-                    cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', cleaned)
-                    cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)
-
-                    title = clean_text(cleaned)
-                    if not title or len(title) < 5:
-                        continue
+                    cleaned = clean_text(cleaned)[:100]
 
                     username = mention.get("username", "")
-                    if username:
-                        title = f"@{username}: {title}"
+                    title = f"Review @{username}: {cleaned}" if username else f"Review: {cleaned}"
 
                     suggestion = Todo(
                         title=title,
@@ -270,7 +228,7 @@ def run_sync(hours: int = 24) -> dict:
                     )
                     suggestion.save()
                     stats["slack_extracted"] += 1
-                    print(f"   ✓ #{channel_name}: captured raw suggestion")
+                    print(f"   ○ #{channel_name} ({context_type}): no actions found, created review suggestion")
 
                 # Mark as processed
                 slack.mark_processed(mention["id"])
