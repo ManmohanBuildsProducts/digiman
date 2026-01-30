@@ -14,6 +14,7 @@ STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 
 from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
+from digiman.ingesters.meeting_archive import MeetingArchiveIngester
 
 
 def clean_text(text: str) -> str:
@@ -43,6 +44,8 @@ def run_sync(hours: int = 24) -> dict:
     stats = {
         "granola_processed": 0,
         "granola_extracted": 0,
+        "meeting_archive_processed": 0,
+        "meeting_archive_extracted": 0,
         "slack_processed": 0,
         "slack_extracted": 0,
         "errors": []
@@ -116,6 +119,54 @@ def run_sync(hours: int = 24) -> dict:
         print(f"   ❌ {error}")
         stats["errors"].append(error)
 
+    # ========== Meeting Archive Sync (SMART_PASTE processed files) ==========
+    print("\n📂 Processing SMART_PASTE meeting archive...")
+    try:
+        archive = MeetingArchiveIngester()
+        processed_meetings = archive.get_recent_meetings(hours=hours)
+        print(f"   Found {len(processed_meetings)} processed meetings")
+
+        for meeting in processed_meetings:
+            try:
+                action_items = meeting.get("action_items", [])
+
+                for item in action_items:
+                    title = item.get("title", "")
+                    if not title:
+                        continue
+
+                    # Include owner in title if available
+                    owner = item.get("owner")
+                    if owner:
+                        title = f"{title} (Owner: {owner})"
+
+                    suggestion = Todo(
+                        title=clean_text(title),
+                        description=f"Due: {item.get('due', 'TBD')} | Context: {item.get('context', 'N/A')}",
+                        source_type="granola",  # Keep as granola for consistency
+                        source_id=meeting["id"],
+                        source_context=meeting["title"],
+                        is_suggestion=True,
+                        extraction_confidence=item.get("confidence", 0.9)
+                    )
+                    suggestion.save()
+                    stats["meeting_archive_extracted"] += 1
+
+                print(f"   ✓ {meeting['title']}: {len(action_items)} structured action items")
+
+                archive.mark_processed(meeting["id"])
+                stats["meeting_archive_processed"] += 1
+
+            except Exception as e:
+                error = f"Error processing archive meeting {meeting.get('id')}: {e}"
+                print(f"   ❌ {error}")
+                stats["errors"].append(error)
+
+    except Exception as e:
+        error = f"Meeting archive sync error: {e}"
+        print(f"   ❌ {error}")
+        stats["errors"].append(error)
+
     # ========== Slack Sync ==========
     print("\n💬 Processing Slack mentions...")
     try:
@@ -174,8 +225,8 @@ def run_sync(hours: int = 24) -> dict:
         stats["errors"].append(error)
 
     # Complete sync record
-    total_processed = stats["granola_processed"] + stats["slack_processed"]
-    total_extracted = stats["granola_extracted"] + stats["slack_extracted"]
+    total_processed = stats["granola_processed"] + stats["meeting_archive_processed"] + stats["slack_processed"]
+    total_extracted = stats["granola_extracted"] + stats["meeting_archive_extracted"] + stats["slack_extracted"]
     errors_str = "; ".join(stats["errors"]) if stats["errors"] else None
 
     SyncHistory.complete(sync_id, total_processed, total_extracted, errors_str)
@@ -183,7 +234,8 @@ def run_sync(hours: int = 24) -> dict:
     # Summary
     print("\n" + "=" * 40)
     print("📊 Sync Summary:")
-    print(f"   Granola: {stats['granola_processed']} meetings → {stats['granola_extracted']} todos")
+    print(f"   Granola (raw): {stats['granola_processed']} meetings → {stats['granola_extracted']} todos")
+    print(f"   Meeting Archive (SMART_PASTE): {stats['meeting_archive_processed']} meetings → {stats['meeting_archive_extracted']} todos")
     print(f"   Slack: {stats['slack_processed']} mentions → {stats['slack_extracted']} todos")
     if stats["errors"]:
         print(f"   Errors: {len(stats['errors'])}")
