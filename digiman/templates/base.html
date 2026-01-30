@@ -241,6 +241,22 @@
         .todo-item:hover .quick-complete {
             opacity: 1;
         }
+
+        /* Suggestion Edit Mode */
+        .suggestion-item.editing {
+            background-color: #fefce8 !important;
+            border-left: 3px solid #eab308;
+        }
+        .edit-mode input,
+        .edit-mode textarea {
+            background-color: white;
+        }
+        .edit-mode textarea {
+            min-height: 48px;
+        }
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="h-full bg-gray-50">

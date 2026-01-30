@@ -207,17 +207,24 @@ def api_update_todo(todo_id: int):
         return jsonify({"error": "Not found"}), 404
 
     data = get_request_data()
+    needs_save = False
 
     if "title" in data:
         todo.title = data["title"]
+        needs_save = True
     if "description" in data:
         todo.description = data["description"]
+        needs_save = True
     if "status" in data:
         if data["status"] == "completed":
             todo.complete()
+            needs_save = False  # complete() already saves
         else:
             todo.status = data["status"]
-            todo.save()
+            needs_save = True
+
+    if needs_save:
+        todo.save()
 
     if request.headers.get("HX-Request"):
         return render_template("partials/todo_item.html", todo=todo)
