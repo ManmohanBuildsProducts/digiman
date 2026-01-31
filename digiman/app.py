@@ -47,6 +47,7 @@ def get_request_data():
             return json.loads(request.data)
         except (json.JSONDecodeError, ValueError):
             pass
+    return {}
 
 
 import re
@@ -125,7 +126,6 @@ def should_reject_suggestion(title: str, description: str = None) -> tuple[bool,
         return True, "too_short"
 
     return False, ""
-    return {}
 
 
 @app.before_request
@@ -141,13 +141,17 @@ def inject_global_data():
         suggestions = Todo.get_suggestions()
         all_tags = Todo.get_all_tags()
         active_tag = request.args.get('tag')
+        tomorrow_todos = Todo.get_tomorrow()
+        backlog_todos = Todo.get_backlog()
         return {
             "suggestion_count": len(suggestions),
             "all_tags": all_tags,
-            "active_tag": active_tag
+            "active_tag": active_tag,
+            "tomorrow_count": len(tomorrow_todos),
+            "backlog_count": len(backlog_todos)
         }
     except:
-        return {"suggestion_count": 0, "all_tags": {}, "active_tag": None}
+        return {"suggestion_count": 0, "all_tags": {}, "active_tag": None, "tomorrow_count": 0, "backlog_count": 0}
 
 
 # ============== Static Files ==============
@@ -261,6 +265,36 @@ def calendar_view():
     )
 
 
+@app.route("/tomorrow")
+def tomorrow_view():
+    """Tomorrow view - tasks due tomorrow."""
+    tag_filter = request.args.get('tag')
+    todos = Todo.get_tomorrow(tag_filter=tag_filter)
+    tomorrow = date.today() + timedelta(days=1)
+
+    return render_template(
+        "tomorrow.html",
+        todos=todos,
+        tomorrow=tomorrow,
+        today=date.today(),
+        active_page="tomorrow"
+    )
+
+
+@app.route("/backlog")
+def backlog_view():
+    """Backlog view - tasks without specific dates."""
+    tag_filter = request.args.get('tag')
+    todos = Todo.get_backlog(tag_filter=tag_filter)
+
+    return render_template(
+        "backlog.html",
+        todos=todos,
+        today=date.today(),
+        active_page="backlog"
+    )
+
+
 # ============== API Routes ==============
 
 @app.route("/api/todos", methods=["GET"])
@@ -345,6 +379,11 @@ def api_update_todo(todo_id: int):
         else:
             todo.status = data["status"]
             needs_save = True
+    if "due_date" in data:
+        todo.due_date = data["due_date"] if data["due_date"] else None
+        if todo.due_date:
+            todo.timeline_type = "date"
+        needs_save = True
 
     if needs_save:
         todo.save()
@@ -442,6 +481,16 @@ def api_get_tags():
         for name, count in tags.items()
     ]
     return jsonify(result)
+
+
+@app.route("/api/todos/search")
+def api_search_todos():
+    """Search todos by title/description."""
+    query = request.args.get("q", "").strip().lower()
+    if not query or len(query) < 2:
+        return jsonify([])
+    todos = Todo.search(query)
+    return jsonify([t.to_dict() for t in todos])
 
 
 @app.route("/api/sync", methods=["POST"])

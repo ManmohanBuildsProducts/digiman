@@ -2,7 +2,7 @@
 
 import sqlite3
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
@@ -489,6 +489,86 @@ class Todo:
         self.status = "discarded"
         self.is_suggestion = False
         self.save()
+
+    @classmethod
+    def search(cls, query: str, limit: int = 20) -> List["Todo"]:
+        """Search todos by title and description using fuzzy matching.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+
+        Returns:
+            List of matching todos, prioritizing title matches over description matches
+        """
+        pattern = f"%{query}%"
+        with get_db() as conn:
+            # Search with priority: title matches first, then description matches
+            # Exclude suggestions and completed items
+            rows = conn.execute("""
+                SELECT *,
+                    CASE
+                        WHEN LOWER(title) LIKE LOWER(?) THEN 1
+                        ELSE 2
+                    END as match_priority
+                FROM todos
+                WHERE (LOWER(title) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
+                AND status != 'completed'
+                ORDER BY match_priority ASC, created_at DESC
+                LIMIT ?
+            """, (pattern, pattern, pattern, limit)).fetchall()
+            return [cls(row=row) for row in rows]
+
+    @classmethod
+    def get_tomorrow(cls, tag_filter: Optional[str] = None) -> List["Todo"]:
+        """Get todos due tomorrow.
+
+        Args:
+            tag_filter: Optional tag name to filter by
+
+        Returns:
+            List of pending todos due tomorrow
+        """
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+        def filter_by_tag(todos: List["Todo"]) -> List["Todo"]:
+            if not tag_filter:
+                return todos
+            return [t for t in todos if tag_filter in t.tags]
+
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT * FROM todos
+                WHERE timeline_type = 'date' AND due_date = ? AND status = 'pending'
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
+                ORDER BY created_at DESC
+            """, (tomorrow,)).fetchall()
+            return filter_by_tag([cls(row=row) for row in rows])
+
+    @classmethod
+    def get_backlog(cls, tag_filter: Optional[str] = None) -> List["Todo"]:
+        """Get todos in backlog.
+
+        Args:
+            tag_filter: Optional tag name to filter by
+
+        Returns:
+            List of pending backlog todos
+        """
+        def filter_by_tag(todos: List["Todo"]) -> List["Todo"]:
+            if not tag_filter:
+                return todos
+            return [t for t in todos if tag_filter in t.tags]
+
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT * FROM todos
+                WHERE timeline_type = 'backlog' AND status = 'pending'
+                AND (is_suggestion = 0 OR is_suggestion IS NULL)
+                ORDER BY created_at DESC
+            """).fetchall()
+            return filter_by_tag([cls(row=row) for row in rows])
 
 
 class SyncHistory:

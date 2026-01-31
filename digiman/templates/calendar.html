@@ -5,50 +5,50 @@
 {% block content %}
 <div class="space-y-6" x-data="calendarApp()">
     <!-- Month Navigation -->
-    <div class="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+    <div class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <a href="/calendar?year={{ prev_year }}&month={{ prev_month }}"
-           class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+           class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
             <i data-lucide="chevron-left" class="w-5 h-5"></i>
         </a>
         <div class="text-center">
-            <h2 class="text-lg font-bold text-gray-900">{{ month_name }} {{ year }}</h2>
-            <a href="/calendar" class="text-xs text-blue-600 hover:text-blue-700">Jump to today</a>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ month_name }} {{ year }}</h2>
+            <a href="/calendar" class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">Jump to today</a>
         </div>
         <a href="/calendar?year={{ next_year }}&month={{ next_month }}"
-           class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+           class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
             <i data-lucide="chevron-right" class="w-5 h-5"></i>
         </a>
     </div>
 
     <!-- Calendar Grid -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <!-- Day Headers -->
-        <div class="grid grid-cols-7 border-b border-gray-200">
+        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
             {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-            <div class="p-3 text-center text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wide">{{ day }}</div>
+            <div class="p-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 uppercase tracking-wide">{{ day }}</div>
             {% endfor %}
         </div>
 
         <!-- Calendar Days -->
         {% for week in month_days %}
-        <div class="grid grid-cols-7 border-b border-gray-100 last:border-b-0">
+        <div class="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
             {% for day in week %}
-            <div class="calendar-day p-2 border-r border-gray-100 last:border-r-0 min-h-[80px] cursor-pointer hover:bg-blue-50/50 transition-colors
-                        {% if day == today.day and month == today.month and year == today.year %}bg-blue-50 ring-2 ring-inset ring-blue-200{% endif %}
-                        {% if day in day_counts and day_counts[day].overdue %}bg-red-50{% endif %}"
+            <div class="calendar-day p-2 border-r border-gray-100 dark:border-gray-700 last:border-r-0 min-h-[80px] cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors
+                        {% if day == today.day and month == today.month and year == today.year %}bg-blue-50 dark:bg-blue-900/30 ring-2 ring-inset ring-blue-200 dark:ring-blue-700{% endif %}
+                        {% if day in day_counts and day_counts[day].overdue %}bg-red-50 dark:bg-red-900/20{% endif %}"
                  {% if day != 0 %}
                  @click="selectDate('{{ year }}-{{ '%02d'|format(month) }}-{{ '%02d'|format(day) }}')"
-                 :class="{ 'bg-blue-100 ring-2 ring-blue-500': selectedDate === '{{ year }}-{{ '%02d'|format(month) }}-{{ '%02d'|format(day) }}' }"
+                 :class="{ 'bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500': selectedDate === '{{ year }}-{{ '%02d'|format(month) }}-{{ '%02d'|format(day) }}' }"
                  {% endif %}>
                 {% if day != 0 %}
                 <div class="flex items-start justify-between">
-                    <span class="w-7 h-7 flex items-center justify-center rounded-full text-sm
-                                {% if day == today.day and month == today.month and year == today.year %}bg-blue-600 text-white font-bold{% else %}text-gray-700 font-medium{% endif %}">
+                    <span class="calendar-day-number w-7 h-7 flex items-center justify-center rounded-full text-sm
+                                {% if day == today.day and month == today.month and year == today.year %}bg-blue-600 text-white font-bold{% else %}text-gray-700 dark:text-gray-300 font-medium{% endif %}">
                         {{ day }}
                     </span>
                     {% if day in day_counts and day_counts[day].count > 0 %}
                     <span class="px-2 py-0.5 text-xs font-bold rounded-full
-                                {% if day_counts[day].overdue %}bg-red-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">
+                                {% if day_counts[day].overdue %}bg-red-500 text-white{% else %}bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300{% endif %}">
                         {{ day_counts[day].count }}
                     </span>
                     {% endif %}
@@ -61,49 +61,49 @@
     </div>
 
     <!-- Selected Date Panel -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" x-show="selectedDate" x-collapse x-cloak>
-        <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
-            <h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden" x-show="selectedDate" x-collapse x-cloak>
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-blue-50 dark:from-blue-900/30 to-white dark:to-gray-800">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                    <i data-lucide="calendar" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
                 </div>
                 <span x-text="formatDate(selectedDate)"></span>
             </h3>
-            <button @click="selectedDate = null" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button @click="selectedDate = null" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
 
         <!-- Todos for selected date -->
-        <div id="selected-date-todos" class="divide-y divide-gray-100">
+        <div id="selected-date-todos" class="divide-y divide-gray-100 dark:divide-gray-700">
             <template x-if="isLoadingTodos">
-                <div class="p-8 text-center text-gray-400">
+                <div class="p-8 text-center text-gray-400 dark:text-gray-500">
                     <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                     <p class="text-sm">Loading...</p>
                 </div>
             </template>
             <template x-if="!isLoadingTodos && dateTodos.length === 0">
-                <div class="p-8 text-center text-gray-400">
+                <div class="p-8 text-center text-gray-400 dark:text-gray-500">
                     <i data-lucide="calendar-check" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
                     <p class="text-sm">No todos for this date yet</p>
                 </div>
             </template>
             <template x-for="todo in dateTodos" :key="todo.id">
-                <div class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors group"
+                <div class="flex items-start gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
                      :class="{ 'opacity-60': todo.status === 'completed' }">
                     <button @click="toggleTodo(todo.id)"
                             class="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                            :class="todo.status === 'completed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-blue-500'">
+                            :class="todo.status === 'completed' ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 dark:border-gray-600 hover:border-blue-500'">
                         <i x-show="todo.status === 'completed'" data-lucide="check" class="w-3 h-3"></i>
                     </button>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-900"
-                           :class="{ 'line-through text-gray-500': todo.status === 'completed' }"
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100"
+                           :class="{ 'line-through text-gray-500 dark:text-gray-400': todo.status === 'completed' }"
                            x-text="todo.title"></p>
-                        <p x-show="todo.description" class="text-xs text-gray-500 mt-1" x-text="todo.description"></p>
+                        <p x-show="todo.description" class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="todo.description"></p>
                     </div>
                     <button @click="deleteTodo(todo.id)"
-                            class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                            class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
@@ -111,14 +111,14 @@
         </div>
 
         <!-- Add todo for this date -->
-        <div class="p-4 border-t border-gray-100 bg-gray-50/50">
+        <div class="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
             <form @submit.prevent="addTodoForDate()">
                 <div class="flex gap-2">
                     <div class="input-with-hint flex-1 relative">
                         <input type="text"
                                x-model="newTodoTitle"
                                placeholder="What needs to be done?"
-                               class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                               class="w-full px-4 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
                                autocomplete="off">
                         <span class="input-hint">Press Enter</span>
                     </div>
@@ -133,9 +133,9 @@
                     <input type="text"
                            x-model="newTodoDescription"
                            placeholder="Add more details..."
-                           class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+                           class="w-full px-4 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400">
                 </div>
-                <button type="button" @click="showDateDesc = !showDateDesc" class="text-xs text-gray-500 hover:text-blue-600 mt-2 flex items-center gap-1 transition-colors">
+                <button type="button" @click="showDateDesc = !showDateDesc" class="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 mt-2 flex items-center gap-1 transition-colors">
                     <i :data-lucide="showDateDesc ? 'minus' : 'plus'" class="w-3 h-3"></i>
                     <span x-text="showDateDesc ? 'Hide details' : 'Add details'"></span>
                 </button>
@@ -144,44 +144,44 @@
     </div>
 
     <!-- Weekly Todos -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
              @click="showWeekly = !showWeekly">
-            <h3 class="text-sm font-bold text-gray-900 flex items-center gap-3">
-                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="calendar-range" class="w-4 h-4 text-purple-600"></i>
+            <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                <div class="w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center">
+                    <i data-lucide="calendar-range" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i>
                 </div>
                 <div>
                     <span class="uppercase tracking-wide">This Week</span>
-                    <p class="text-xs text-gray-500 font-normal">Flexible deadline items</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-normal">Flexible deadline items</p>
                 </div>
-                <span class="px-2.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{{ cal_data.weekly|length }}</span>
+                <span class="px-2.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-full">{{ cal_data.weekly|length }}</span>
             </h3>
-            <i data-lucide="chevron-down" class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': showWeekly }"></i>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': showWeekly }"></i>
         </div>
-        <div x-show="showWeekly" x-collapse class="divide-y divide-gray-100 todo-section-content">
+        <div x-show="showWeekly" x-collapse class="divide-y divide-gray-100 dark:divide-gray-700 todo-section-content">
             {% if cal_data.weekly %}
                 {% for todo in cal_data.weekly %}
                     {% include "partials/todo_item.html" %}
                 {% endfor %}
             {% else %}
                 <div class="p-8 text-center">
-                    <div class="w-12 h-12 mx-auto mb-3 bg-purple-50 rounded-xl flex items-center justify-center">
-                        <i data-lucide="inbox" class="w-6 h-6 text-purple-300"></i>
+                    <div class="w-12 h-12 mx-auto mb-3 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
+                        <i data-lucide="inbox" class="w-6 h-6 text-purple-300 dark:text-purple-500"></i>
                     </div>
-                    <p class="text-gray-500 text-sm">No weekly todos yet</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">No weekly todos yet</p>
                 </div>
             {% endif %}
         </div>
         <!-- Add weekly todo -->
-        <div x-show="showWeekly" x-collapse class="p-4 border-t border-gray-100 bg-gray-50/50">
+        <div x-show="showWeekly" x-collapse class="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
             <form @submit.prevent="addWeeklyTodo()">
                 <div class="flex gap-2">
                     <div class="input-with-hint flex-1 relative">
                         <input type="text"
                                x-model="newWeeklyTodo"
                                placeholder="What do you want to get done this week?"
-                               class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                               class="w-full px-4 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
                                autocomplete="off">
                         <span class="input-hint">Press Enter</span>
                     </div>
@@ -196,9 +196,9 @@
                     <input type="text"
                            x-model="newWeeklyDescription"
                            placeholder="Add more details..."
-                           class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white">
+                           class="w-full px-4 py-2.5 text-sm border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400">
                 </div>
-                <button type="button" @click="showWeeklyDesc = !showWeeklyDesc" class="text-xs text-gray-500 hover:text-purple-600 mt-2 flex items-center gap-1 transition-colors">
+                <button type="button" @click="showWeeklyDesc = !showWeeklyDesc" class="text-xs text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 mt-2 flex items-center gap-1 transition-colors">
                     <i :data-lucide="showWeeklyDesc ? 'minus' : 'plus'" class="w-3 h-3"></i>
                     <span x-text="showWeeklyDesc ? 'Hide details' : 'Add details'"></span>
                 </button>
@@ -208,18 +208,18 @@
 
     <!-- Monthly Todos -->
     {% if cal_data.monthly %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex items-center gap-3">
-            <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                <i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+            <div class="w-8 h-8 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
+                <i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
             </div>
             <div>
-                <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide">{{ month_name }}</h3>
-                <p class="text-xs text-gray-500">Monthly goals</p>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">{{ month_name }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Monthly goals</p>
             </div>
-            <span class="ml-auto px-2.5 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">{{ cal_data.monthly|length }}</span>
+            <span class="ml-auto px-2.5 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-xs font-bold rounded-full">{{ cal_data.monthly|length }}</span>
         </div>
-        <div class="divide-y divide-gray-100 todo-section-content">
+        <div class="divide-y divide-gray-100 dark:divide-gray-700 todo-section-content">
             {% for todo in cal_data.monthly %}
                 {% include "partials/todo_item.html" %}
             {% endfor %}
@@ -229,22 +229,22 @@
 
     <!-- Backlog -->
     {% if cal_data.backlog %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
              @click="showBacklog = !showBacklog">
-            <h3 class="text-sm font-bold text-gray-900 flex items-center gap-3">
-                <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="archive" class="w-4 h-4 text-gray-500"></i>
+            <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                <div class="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                    <i data-lucide="archive" class="w-4 h-4 text-gray-500 dark:text-gray-400"></i>
                 </div>
                 <div>
                     <span class="uppercase tracking-wide">Backlog</span>
-                    <p class="text-xs text-gray-500 font-normal">Someday/maybe items</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-normal">Someday/maybe items</p>
                 </div>
-                <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">{{ cal_data.backlog|length }}</span>
+                <span class="px-2.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-full">{{ cal_data.backlog|length }}</span>
             </h3>
-            <i data-lucide="chevron-down" class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': showBacklog }"></i>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200" :class="{ 'rotate-180': showBacklog }"></i>
         </div>
-        <div x-show="showBacklog" x-collapse class="divide-y divide-gray-100 todo-section-content">
+        <div x-show="showBacklog" x-collapse class="divide-y divide-gray-100 dark:divide-gray-700 todo-section-content">
             {% for todo in cal_data.backlog %}
                 {% include "partials/todo_item.html" %}
             {% endfor %}
