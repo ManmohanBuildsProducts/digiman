@@ -1,6 +1,7 @@
 """Todo model and database operations."""
 
 import sqlite3
+import json
 from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -107,6 +108,12 @@ def _run_migrations(conn):
         cursor.execute("ALTER TABLE todos ADD COLUMN is_suggestion BOOLEAN DEFAULT FALSE")
         conn.commit()
 
+    # Migration: Add tags column if it doesn't exist
+    if "tags" not in columns:
+        cursor.execute("ALTER TABLE todos ADD COLUMN tags TEXT DEFAULT '[]'")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_tags ON todos(tags)")
+        conn.commit()
+
 
 class Todo:
     """Todo item model."""
@@ -130,6 +137,7 @@ class Todo:
             self.is_overdue = kwargs.get("is_overdue", False)
             self.days_overdue = kwargs.get("days_overdue", 0)
             self.is_suggestion = kwargs.get("is_suggestion", False)
+            self.tags = kwargs.get("tags", [])
             self.created_at = kwargs.get("created_at")
             self.updated_at = kwargs.get("updated_at")
             self.completed_at = kwargs.get("completed_at")
@@ -152,6 +160,12 @@ class Todo:
         self.is_overdue = bool(row["is_overdue"])
         self.days_overdue = row["days_overdue"]
         self.is_suggestion = bool(row["is_suggestion"]) if "is_suggestion" in row.keys() else False
+        # Parse tags from JSON string
+        tags_raw = row["tags"] if "tags" in row.keys() else "[]"
+        try:
+            self.tags = json.loads(tags_raw) if tags_raw else []
+        except (json.JSONDecodeError, TypeError):
+            self.tags = []
         self.created_at = row["created_at"]
         self.updated_at = row["updated_at"]
         self.completed_at = row["completed_at"]
@@ -175,6 +189,7 @@ class Todo:
             "is_overdue": self.is_overdue,
             "days_overdue": self.days_overdue,
             "is_suggestion": self.is_suggestion,
+            "tags": self.tags,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "completed_at": self.completed_at,
@@ -183,6 +198,9 @@ class Todo:
 
     def save(self) -> int:
         """Save todo to database. Returns the ID."""
+        # Serialize tags to JSON string
+        tags_json = json.dumps(self.tags) if self.tags else "[]"
+
         with get_db() as conn:
             if self.id:
                 conn.execute("""
@@ -190,28 +208,28 @@ class Todo:
                         title = ?, description = ?, source_type = ?, source_id = ?,
                         source_context = ?, source_url = ?, timeline_type = ?,
                         due_date = ?, due_week = ?, due_month = ?, status = ?,
-                        is_overdue = ?, days_overdue = ?, is_suggestion = ?, updated_at = ?,
-                        completed_at = ?, extraction_confidence = ?
+                        is_overdue = ?, days_overdue = ?, is_suggestion = ?, tags = ?,
+                        updated_at = ?, completed_at = ?, extraction_confidence = ?
                     WHERE id = ?
                 """, (
                     self.title, self.description, self.source_type, self.source_id,
                     self.source_context, self.source_url, self.timeline_type,
                     self.due_date, self.due_week, self.due_month, self.status,
-                    self.is_overdue, self.days_overdue, self.is_suggestion, datetime.now().isoformat(),
-                    self.completed_at, self.extraction_confidence, self.id
+                    self.is_overdue, self.days_overdue, self.is_suggestion, tags_json,
+                    datetime.now().isoformat(), self.completed_at, self.extraction_confidence, self.id
                 ))
             else:
                 cursor = conn.execute("""
                     INSERT INTO todos (
                         title, description, source_type, source_id, source_context,
                         source_url, timeline_type, due_date, due_week, due_month,
-                        status, is_overdue, days_overdue, is_suggestion, extraction_confidence
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        status, is_overdue, days_overdue, is_suggestion, tags, extraction_confidence
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     self.title, self.description, self.source_type, self.source_id,
                     self.source_context, self.source_url, self.timeline_type,
                     self.due_date, self.due_week, self.due_month, self.status,
-                    self.is_overdue, self.days_overdue, self.is_suggestion, self.extraction_confidence
+                    self.is_overdue, self.days_overdue, self.is_suggestion, tags_json, self.extraction_confidence
                 ))
                 self.id = cursor.lastrowid
             conn.commit()
@@ -284,11 +302,21 @@ class Todo:
             return [cls(row=row) for row in rows]
 
     @classmethod
-    def get_today(cls) -> Dict[str, List["Todo"]]:
-        """Get todos for today view, grouped by category."""
+    def get_today(cls, tag_filter: Optional[str] = None) -> Dict[str, List["Todo"]]:
+        """Get todos for today view, grouped by category.
+
+        Args:
+            tag_filter: Optional tag name to filter by
+        """
         today = date.today().isoformat()
         current_week = date.today().isocalendar()
         week_str = f"{current_week[0]}-W{current_week[1]:02d}"
+
+        def filter_by_tag(todos: List["Todo"]) -> List["Todo"]:
+            """Filter todos by tag if tag_filter is set."""
+            if not tag_filter:
+                return todos
+            return [t for t in todos if tag_filter in t.tags]
 
         with get_db() as conn:
             # Update overdue status for all pending todos
@@ -339,10 +367,10 @@ class Todo:
             """, (today,)).fetchall()
 
         return {
-            "overdue": [cls(row=row) for row in overdue_rows],
-            "today": [cls(row=row) for row in today_rows],
-            "this_week": [cls(row=row) for row in week_rows],
-            "completed": [cls(row=row) for row in completed_rows],
+            "overdue": filter_by_tag([cls(row=row) for row in overdue_rows]),
+            "today": filter_by_tag([cls(row=row) for row in today_rows]),
+            "this_week": filter_by_tag([cls(row=row) for row in week_rows]),
+            "completed": filter_by_tag([cls(row=row) for row in completed_rows]),
         }
 
     @classmethod
@@ -414,6 +442,26 @@ class Todo:
                 ORDER BY created_at DESC
             """).fetchall()
             return [cls(row=row) for row in rows]
+
+    @classmethod
+    def get_all_tags(cls) -> Dict[str, int]:
+        """Get all unique tags with their counts from non-suggestion, non-completed todos."""
+        tag_counts = {}
+        with get_db() as conn:
+            rows = conn.execute("""
+                SELECT tags FROM todos
+                WHERE (is_suggestion = 0 OR is_suggestion IS NULL)
+                AND status != 'completed'
+                AND tags IS NOT NULL AND tags != '[]'
+            """).fetchall()
+            for row in rows:
+                try:
+                    tags = json.loads(row["tags"]) if row["tags"] else []
+                    for tag in tags:
+                        tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        return tag_counts
 
     def accept_suggestion(self, timeline_type: str, value: Optional[str] = None):
         """Accept a suggestion and convert it to a real todo.

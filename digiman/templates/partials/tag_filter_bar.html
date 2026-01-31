@@ -1,0 +1,19 @@
+{% if active_tag or view_tags %}
+<div class="filter-bar mb-4">
+    {% if active_tag %}
+    <!-- Clear filter button -->
+    <a href="{{ request.path }}" class="filter-chip bg-gray-200 hover:bg-gray-300">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        Clear
+    </a>
+    {% endif %}
+
+    {% for tag, count in (view_tags or all_tags).items() %}
+    <a href="?tag={{ tag }}" class="filter-chip {% if active_tag == tag %}active{% endif %}">
+        <span class="tag-dot" style="background-color: {{ tag_color(tag) }};"></span>
+        {{ tag }}
+        <span class="text-xs opacity-70">({{ count }})</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}

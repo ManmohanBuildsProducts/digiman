@@ -24,6 +24,18 @@
                     {% if todo.description %}
                     <p class="text-xs text-gray-500 mt-1 leading-relaxed">{{ todo.description }}</p>
                     {% endif %}
+
+                    <!-- Tags -->
+                    {% if todo.tags %}
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                        {% for tag in todo.tags %}
+                        <a href="?tag={{ tag }}" class="tag-chip" onclick="event.stopPropagation();">
+                            <span class="tag-dot" style="background-color: {{ tag_color(tag) }};"></span>
+                            {{ tag }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Expand hint icon -->

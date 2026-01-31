@@ -3,6 +3,9 @@
 {% block title %}Today - Digiman{% endblock %}
 
 {% block content %}
+<!-- Filter bar -->
+{% include "partials/tag_filter_bar.html" %}
+
 <div id="todo-container">
     {% include "partials/todo_list.html" %}
 </div>
@@ -41,9 +44,11 @@
 
         const titleInput = form.querySelector('.todo-title-input');
         const descInput = form.querySelector('.todo-desc-input');
+        const tagsInput = form.querySelector('.todo-tags-input');
         const submitBtn = form.querySelector('.submit-btn');
         const title = titleInput.value.trim();
         const description = descInput ? descInput.value.trim() : '';
+        const tags = tagsInput ? tagsInput.value.trim() : '';
 
         if (!title) {
             titleInput.focus();
@@ -59,7 +64,8 @@
         const payload = {
             title: title,
             description: description || null,
-            timeline_type: timeline
+            timeline_type: timeline,
+            tags: tags || null
         };
 
         if (timeline === 'date' && dueDate) {
@@ -106,16 +112,19 @@
 
                 // Clear inputs and hide description
                 titleInput.value = '';
-                if (descInput) {
-                    descInput.value = '';
-                    const descRow = form.querySelector('.desc-row');
-                    const toggleBtn = form.querySelector('.toggle-desc');
-                    if (descRow && !descRow.classList.contains('hidden')) {
-                        descRow.classList.add('hidden');
-                        toggleBtn.querySelector('span').textContent = 'Add details';
-                        toggleBtn.querySelector('i').setAttribute('data-lucide', 'plus');
-                        lucide.createIcons();
-                    }
+                if (descInput) descInput.value = '';
+                if (tagsInput) {
+                    tagsInput.value = '';
+                    const tagPreview = form.querySelector('.tag-preview');
+                    if (tagPreview) tagPreview.innerHTML = '';
+                }
+                const descRow = form.querySelector('.desc-row');
+                const toggleBtn = form.querySelector('.toggle-desc');
+                if (descRow && !descRow.classList.contains('hidden')) {
+                    descRow.classList.add('hidden');
+                    toggleBtn.querySelector('span').textContent = 'Add details';
+                    toggleBtn.querySelector('i').setAttribute('data-lucide', 'plus');
+                    lucide.createIcons();
                 }
 
                 // Show success toast
@@ -140,6 +149,24 @@
             e.preventDefault();
             e.target.closest('form').dispatchEvent(new Event('submit'));
         }
+    });
+
+    // Tag input preview
+    document.addEventListener('input', function(e) {
+        if (!e.target.classList.contains('todo-tags-input')) return;
+
+        const form = e.target.closest('form');
+        const preview = form.querySelector('.tag-preview');
+        if (!preview) return;
+
+        const tags = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(t => t);
+
+        preview.innerHTML = tags.map(tag => `
+            <span class="tag-chip">
+                <span class="tag-dot" style="background-color: ${getTagColor(tag)};"></span>
+                ${tag}
+            </span>
+        `).join('');
     });
 </script>
 {% endblock %}

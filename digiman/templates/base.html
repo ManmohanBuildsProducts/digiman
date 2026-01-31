@@ -17,6 +17,149 @@
             font-family: 'Inter', sans-serif !important;
         }
 
+        /* Sidebar Styles */
+        .sidebar {
+            width: 240px;
+            transition: transform 0.3s ease;
+        }
+        @media (max-width: 767px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 40;
+                transform: translateX(-100%);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        /* Sidebar overlay for mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 30;
+        }
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        /* Nav item styles */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #4b5563;
+            transition: all 0.15s ease;
+        }
+        .nav-item:hover {
+            background-color: #f3f4f6;
+            color: #111827;
+        }
+        .nav-item.active {
+            background-color: #111827;
+            color: white;
+        }
+        .nav-item.active .nav-icon {
+            color: white;
+        }
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            color: #6b7280;
+        }
+
+        /* Tag item in sidebar */
+        .tag-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #4b5563;
+            transition: all 0.15s ease;
+        }
+        .tag-item:hover {
+            background-color: #f3f4f6;
+        }
+        .tag-item.active {
+            background-color: #e5e7eb;
+            font-weight: 500;
+        }
+        .tag-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Tag chip styles */
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            transition: all 0.15s ease;
+        }
+        .tag-chip:hover {
+            background-color: #e5e7eb;
+        }
+        .tag-chip .tag-dot {
+            width: 6px;
+            height: 6px;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar {
+            display: none;
+        }
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+        .filter-chip:hover {
+            background-color: #e5e7eb;
+        }
+        .filter-chip.active {
+            background-color: #111827;
+            color: white;
+        }
+        .filter-chip.active .tag-dot {
+            box-shadow: 0 0 0 2px white;
+        }
+
         /* Todo Item Styles */
         .todo-item {
             transition: all 0.2s ease;
@@ -157,23 +300,6 @@
             }
         }
 
-        /* Mobile responsive fixes */
-        @media (max-width: 639px) {
-            .nav-tabs {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
-            }
-            .nav-tabs::-webkit-scrollbar {
-                display: none;
-            }
-            .nav-tabs a {
-                white-space: nowrap;
-                flex-shrink: 0;
-            }
-        }
-
         /* Prevent horizontal page scroll */
         html, body {
             overflow-x: hidden;
@@ -291,63 +417,152 @@
         .hidden {
             display: none !important;
         }
+
+        /* Alpine cloak */
+        [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="h-full bg-gray-50">
+<body class="h-full bg-gray-50" x-data="{ sidebarOpen: false }">
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <div class="min-h-full">
-        <!-- Navigation -->
-        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-14">
-                    <div class="flex items-center">
-                        <a href="/" class="flex items-center gap-2">
-                            <span class="text-xl">🧠</span>
-                            <span class="text-lg font-semibold text-gray-900">Digiman</span>
-                        </a>
-                    </div>
-                    <div class="flex items-center gap-1 nav-tabs">
-                        <a href="/"
-                           class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                                  {% if active_page == 'today' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
-                            Today
-                        </a>
-                        <a href="/inbox"
-                           class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5
-                                  {% if active_page == 'inbox' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
-                            Inbox
-                            {% if suggestion_count and suggestion_count > 0 %}
-                            <span class="px-1.5 py-0.5 text-xs font-bold rounded-full
-                                {% if active_page == 'inbox' %}bg-white text-gray-900{% else %}bg-amber-500 text-white{% endif %}">
-                                {{ suggestion_count }}
-                            </span>
-                            {% endif %}
-                        </a>
-                        <a href="/calendar"
-                           class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                                  {% if active_page == 'calendar' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
-                            Calendar
-                        </a>
-                        <a href="/status"
-                           class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1
-                                  {% if active_page == 'status' %}bg-gray-900 text-white{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
-                            <i data-lucide="activity" class="w-4 h-4"></i>
-                            <span class="hidden sm:inline">Monitor</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </nav>
+    <!-- Mobile sidebar overlay -->
+    <div class="sidebar-overlay" :class="{ 'open': sidebarOpen }" @click="sidebarOpen = false"></div>
 
-        <!-- Main Content -->
-        <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {% block content %}{% endblock %}
-        </main>
+    <div class="min-h-full flex">
+        <!-- Sidebar -->
+        <aside class="sidebar bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0"
+               :class="{ 'open': sidebarOpen }">
+            <!-- Logo -->
+            <div class="p-4 border-b border-gray-100">
+                <a href="/" class="flex items-center gap-2">
+                    <span class="text-2xl">🧠</span>
+                    <span class="text-lg font-bold text-gray-900">Digiman</span>
+                </a>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+                <!-- Overview Section -->
+                <div class="mb-4">
+                    <p class="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Overview</p>
+
+                    <a href="/" class="nav-item {% if active_page == 'today' %}active{% endif %}">
+                        <i data-lucide="sun" class="nav-icon"></i>
+                        <span>Today</span>
+                        {% if todos_today_count is defined and todos_today_count > 0 %}
+                        <span class="ml-auto px-2 py-0.5 text-xs font-bold rounded-full
+                            {% if active_page == 'today' %}bg-white/20 text-white{% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ todos_today_count }}
+                        </span>
+                        {% endif %}
+                    </a>
+
+                    <a href="/inbox" class="nav-item {% if active_page == 'inbox' %}active{% endif %}">
+                        <i data-lucide="inbox" class="nav-icon"></i>
+                        <span>Inbox</span>
+                        {% if suggestion_count and suggestion_count > 0 %}
+                        <span class="ml-auto px-2 py-0.5 text-xs font-bold rounded-full
+                            {% if active_page == 'inbox' %}bg-white/20 text-white{% else %}bg-amber-500 text-white{% endif %}">
+                            {{ suggestion_count }}
+                        </span>
+                        {% endif %}
+                    </a>
+
+                    <a href="/calendar" class="nav-item {% if active_page == 'calendar' %}active{% endif %}">
+                        <i data-lucide="calendar" class="nav-icon"></i>
+                        <span>Calendar</span>
+                    </a>
+
+                    <a href="/status" class="nav-item {% if active_page == 'status' %}active{% endif %}">
+                        <i data-lucide="activity" class="nav-icon"></i>
+                        <span>Monitor</span>
+                    </a>
+                </div>
+
+                <!-- Tags Section -->
+                {% if all_tags %}
+                <div class="pt-3 border-t border-gray-100">
+                    <p class="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Tags</p>
+                    {% for tag, count in all_tags.items() %}
+                    <a href="?tag={{ tag }}" class="tag-item {% if active_tag == tag %}active{% endif %}">
+                        <span class="tag-dot" style="background-color: {{ tag_color(tag) }};"></span>
+                        <span class="flex-1 truncate">{{ tag }}</span>
+                        <span class="text-xs text-gray-400">{{ count }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </nav>
+
+            <!-- Footer -->
+            <div class="p-4 border-t border-gray-100">
+                <p class="text-xs text-gray-400 text-center">
+                    Crafted with ❤️ in 🇮🇳
+                </p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col min-h-screen">
+            <!-- Mobile Header -->
+            <header class="md:hidden bg-white border-b border-gray-200 sticky top-0 z-20">
+                <div class="flex items-center justify-between px-4 h-14">
+                    <button @click="sidebarOpen = true" class="p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+                        <i data-lucide="menu" class="w-5 h-5"></i>
+                    </button>
+                    <span class="font-semibold text-gray-900">
+                        {% if active_page == 'today' %}Today
+                        {% elif active_page == 'inbox' %}Inbox
+                        {% elif active_page == 'calendar' %}Calendar
+                        {% elif active_page == 'status' %}Monitor
+                        {% else %}Digiman{% endif %}
+                    </span>
+                    <div class="w-9"></div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                {% block content %}{% endblock %}
+            </main>
+
+            <!-- Footer (desktop) -->
+            <footer class="hidden md:block mt-auto py-6 border-t border-gray-200 bg-gray-50">
+                <div class="max-w-4xl mx-auto px-4 text-center">
+                    <p class="text-gray-600 text-sm flex items-center justify-center gap-2">
+                        <span>Crafted with</span>
+                        <span class="text-red-500">❤️</span>
+                        <span>in</span>
+                        <span class="text-2xl">🇮🇳</span>
+                        <span>India</span>
+                    </p>
+                    <p class="text-gray-500 text-xs mt-2">
+                        <span class="font-medium">Manmohan</span>
+                        <span class="mx-2">•</span>
+                        <a href="mailto:manmohan@badho.in" class="hover:text-gray-700 underline">manmohan@badho.in</a>
+                    </p>
+                </div>
+            </footer>
+        </div>
     </div>
 
     <script>
+        // Tag color helper (8-color palette)
+        const TAG_COLORS = [
+            '#ef4444', '#f97316', '#eab308', '#22c55e',
+            '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'
+        ];
+
+        function getTagColor(tagName) {
+            if (!tagName) return TAG_COLORS[0];
+            let hash = 0;
+            for (let i = 0; i < tagName.length; i++) {
+                hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+        }
+
         // Toast notification system
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -462,24 +677,15 @@
                 });
             }
         });
-    </script>
 
-    <!-- Footer -->
-    <footer class="mt-auto py-6 border-t border-gray-200 bg-gray-50">
-        <div class="max-w-4xl mx-auto px-4 text-center">
-            <p class="text-gray-600 text-sm flex items-center justify-center gap-2">
-                <span>Crafted with</span>
-                <span class="text-red-500">❤️</span>
-                <span>in</span>
-                <span class="text-2xl">🇮🇳</span>
-                <span>India</span>
-            </p>
-            <p class="text-gray-500 text-xs mt-2">
-                <span class="font-medium">Manmohan</span>
-                <span class="mx-2">•</span>
-                <a href="mailto:manmohan@badho.in" class="hover:text-gray-700 underline">manmohan@badho.in</a>
-            </p>
-        </div>
-    </footer>
+        // Close sidebar on navigation (mobile)
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 768) {
+                    document.querySelector('[x-data]').__x.$data.sidebarOpen = false;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

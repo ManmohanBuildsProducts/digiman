@@ -10,11 +10,30 @@ import subprocess
 from digiman.config import FLASK_SECRET_KEY, FLASK_DEBUG
 from digiman.models import Todo, init_db
 
+# Tag color palette (8 colors)
+TAG_COLORS = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e',
+    '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'
+]
+
+
+def tag_color(tag_name: str) -> str:
+    """Generate a consistent color for a tag name based on hash."""
+    if not tag_name:
+        return TAG_COLORS[0]
+    hash_val = 0
+    for char in tag_name:
+        hash_val = ord(char) + ((hash_val << 5) - hash_val)
+    return TAG_COLORS[abs(hash_val) % len(TAG_COLORS)]
+
 # Deploy webhook secret (set in environment)
 DEPLOY_SECRET = os.getenv("DEPLOY_SECRET", "")
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
+
+# Register tag_color as a Jinja global function
+app.jinja_env.globals['tag_color'] = tag_color
 
 
 def get_request_data():
@@ -116,13 +135,19 @@ def ensure_db():
 
 
 @app.context_processor
-def inject_suggestion_count():
-    """Inject suggestion count into all templates for nav badge."""
+def inject_global_data():
+    """Inject global data into all templates."""
     try:
         suggestions = Todo.get_suggestions()
-        return {"suggestion_count": len(suggestions)}
+        all_tags = Todo.get_all_tags()
+        active_tag = request.args.get('tag')
+        return {
+            "suggestion_count": len(suggestions),
+            "all_tags": all_tags,
+            "active_tag": active_tag
+        }
     except:
-        return {"suggestion_count": 0}
+        return {"suggestion_count": 0, "all_tags": {}, "active_tag": None}
 
 
 # ============== Static Files ==============
@@ -138,11 +163,15 @@ def robots():
 @app.route("/")
 def index():
     """Today view - main dashboard."""
-    todos = Todo.get_today()
+    tag_filter = request.args.get('tag')
+    todos = Todo.get_today(tag_filter=tag_filter)
     suggestions = Todo.get_suggestions()
     today = date.today()
     current_week = today.isocalendar()
     week_str = f"{current_week[0]}-W{current_week[1]:02d}"
+
+    # Count for sidebar badge
+    todos_today_count = len(todos.get('today', [])) + len(todos.get('overdue', []))
 
     return render_template(
         "index.html",
@@ -150,7 +179,8 @@ def index():
         suggestions=suggestions,
         today=today,
         week_str=week_str,
-        active_page="today"
+        active_page="today",
+        todos_today_count=todos_today_count
     )
 
 
@@ -250,6 +280,13 @@ def api_create_todo():
     if not title:
         return jsonify({"error": "Title required"}), 400
 
+    # Parse tags - accept both comma-separated string and array
+    tags_input = data.get("tags", [])
+    if isinstance(tags_input, str):
+        tags = [t.strip().lower() for t in tags_input.split(",") if t.strip()]
+    else:
+        tags = [t.strip().lower() for t in tags_input if t.strip()]
+
     todo = Todo(
         title=title,
         description=data.get("description"),
@@ -258,6 +295,7 @@ def api_create_todo():
         due_date=data.get("due_date") or date.today().isoformat(),
         due_week=data.get("due_week"),
         due_month=data.get("due_month"),
+        tags=tags,
     )
     todo.save()
 
@@ -292,6 +330,13 @@ def api_update_todo(todo_id: int):
         needs_save = True
     if "description" in data:
         todo.description = data["description"]
+        needs_save = True
+    if "tags" in data:
+        tags_input = data["tags"]
+        if isinstance(tags_input, str):
+            todo.tags = [t.strip().lower() for t in tags_input.split(",") if t.strip()]
+        else:
+            todo.tags = [t.strip().lower() for t in tags_input if t.strip()]
         needs_save = True
     if "status" in data:
         if data["status"] == "completed":
@@ -387,6 +432,18 @@ def api_reorder_todos():
     return jsonify({"success": True})
 
 
+@app.route("/api/tags", methods=["GET"])
+def api_get_tags():
+    """Get all tags with counts."""
+    tags = Todo.get_all_tags()
+    # Return as list of objects with color info
+    result = [
+        {"name": name, "count": count, "color": tag_color(name)}
+        for name, count in tags.items()
+    ]
+    return jsonify(result)
+
+
 @app.route("/api/sync", methods=["POST"])
 def api_trigger_sync():
     """Manually trigger a sync."""
@@ -422,6 +479,14 @@ def api_accept_suggestion(suggestion_id: int):
     data = get_request_data()
     timeline_type = data.get("timeline_type", "date")
     value = data.get("value")
+
+    # Handle tags if provided
+    if "tags" in data:
+        tags_input = data["tags"]
+        if isinstance(tags_input, str):
+            suggestion.tags = [t.strip().lower() for t in tags_input.split(",") if t.strip()]
+        else:
+            suggestion.tags = [t.strip().lower() for t in tags_input if t.strip()]
 
     # Handle shortcuts
     if timeline_type == "today":
