@@ -192,12 +192,18 @@ def run_sync(hours: int = 24) -> dict:
                 if action_items:
                     # Create suggestions from extracted action items
                     for item in action_items:
-                        title = clean_text(item)
-                        if not title or len(title) < 5:
+                        item_clean = clean_text(item)
+                        if not item_clean or len(item_clean) < 5:
                             continue
+
+                        # Title: concise (80 chars max, word boundary)
+                        title = item_clean[:80].rsplit(' ', 1)[0] if len(item_clean) > 80 else item_clean
+                        # Description: full text if truncated
+                        description = item_clean if len(item_clean) > 80 else None
 
                         suggestion = Todo(
                             title=title,
+                            description=description,
                             source_type="slack",
                             source_id=mention["id"],
                             source_context=f"#{channel_name}",
@@ -209,17 +215,24 @@ def run_sync(hours: int = 24) -> dict:
 
                     print(f"   ✓ #{channel_name} ({context_type}): {len(action_items)} action items extracted")
                 else:
-                    # No action items found - create a review suggestion
+                    # No action items found - create a review suggestion with full context
                     text = mention.get("text", "")
                     import re
+                    # Remove user mentions for clean title
                     cleaned = re.sub(r'<@[A-Z0-9]+>', '', text)
-                    cleaned = clean_text(cleaned)[:100]
+                    cleaned = clean_text(cleaned)
 
                     username = mention.get("username", "")
-                    title = f"Review @{username}: {cleaned}" if username else f"Review: {cleaned}"
+                    # Title: concise summary (first 80 chars, no "...")
+                    title_text = cleaned[:80].rsplit(' ', 1)[0] if len(cleaned) > 80 else cleaned
+                    title = f"@{username}: {title_text}" if username else title_text
+
+                    # Description: full message for context
+                    description = cleaned if len(cleaned) > 80 else None
 
                     suggestion = Todo(
                         title=title,
+                        description=description,
                         source_type="slack",
                         source_id=mention["id"],
                         source_context=f"#{channel_name}",

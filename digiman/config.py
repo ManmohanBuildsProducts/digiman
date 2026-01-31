@@ -25,6 +25,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # Slack
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_USER_ID = os.getenv("SLACK_USER_ID")
+SLACK_WORKSPACE = os.getenv("SLACK_WORKSPACE", "")  # e.g., "badho" for badho.slack.com
 
 # Flask
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-prod")

@@ -7,7 +7,7 @@ instead of search.messages which requires a user token.
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
-from digiman.config import SLACK_BOT_TOKEN, SLACK_USER_ID
+from digiman.config import SLACK_BOT_TOKEN, SLACK_USER_ID, SLACK_WORKSPACE
 from digiman.models import ProcessedSource
 
 
@@ -121,7 +121,9 @@ class SlackIngester:
                         username = self._get_username(user_id) if user_id else "unknown"
 
                         # Build permalink
-                        permalink = f"https://slack.com/archives/{channel_id}/p{msg.get('ts', '').replace('.', '')}"
+                        # Build permalink with workspace subdomain if configured
+                        slack_domain = f"{SLACK_WORKSPACE}.slack.com" if SLACK_WORKSPACE else "slack.com"
+                        permalink = f"https://{slack_domain}/archives/{channel_id}/p{msg.get('ts', '').replace('.', '')}"
 
                         mention = {
                             "id": msg_id,
