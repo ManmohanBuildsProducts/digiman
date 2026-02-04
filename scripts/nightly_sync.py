@@ -3,6 +3,8 @@
 
 import sys
 import json
+import urllib.request
+import urllib.error
 from pathlib import Path
 from datetime import date, datetime
 
@@ -15,6 +17,7 @@ STATUS_FILE = Path.home() / ".digiman" / "cron_status.json"
 from digiman.models import Todo, SyncHistory, init_db
 from digiman.ingesters import GranolaIngester, SlackIngester
 from digiman.ingesters.meeting_archive import MeetingArchiveIngester
+from digiman.extractors import ActionExtractor
 
 
 def clean_text(text: str) -> str:
@@ -54,9 +57,10 @@ def run_sync(hours: int = 24) -> dict:
     # Start sync record
     sync_id = SyncHistory.start("full")
 
-    # Initialize ingesters
+    # Initialize ingesters and extractors
     granola = GranolaIngester()
     slack = SlackIngester()
+    extractor = ActionExtractor()
 
     today = date.today().isoformat()
 
@@ -91,19 +95,46 @@ def run_sync(hours: int = 24) -> dict:
 
                     print(f"   ✓ {meeting['title']}: {len(action_items)} suggestions")
                 else:
-                    # No action items found - create a suggestion to review
-                    meeting_title = clean_text(meeting["title"])
-                    suggestion = Todo(
-                        title=f"Review meeting: {meeting_title}",
-                        source_type="granola",
-                        source_id=meeting["id"],
-                        source_context=meeting["title"],
-                        source_url=meeting.get("url"),
-                        is_suggestion=True,
-                    )
-                    suggestion.save()
-                    stats["granola_extracted"] += 1
-                    print(f"   ○ {meeting['title']}: created review suggestion")
+                    # No regex matches - try AI extraction as fallback
+                    ai_items = []
+                    try:
+                        content = granola.get_content_for_extraction(meeting)
+                        if content.strip():
+                            ai_items = extractor.extract(content, source_type="meeting")
+                    except Exception as e:
+                        print(f"   ⚠️  AI extraction failed: {e}")
+
+                    if ai_items:
+                        for ai_item in ai_items:
+                            title = clean_text(ai_item.get("title", ""))
+                            if not title:
+                                continue
+                            suggestion = Todo(
+                                title=title,
+                                source_type="granola",
+                                source_id=meeting["id"],
+                                source_context=meeting["title"],
+                                source_url=meeting.get("url"),
+                                is_suggestion=True,
+                                extraction_confidence=ai_item.get("confidence", 0.8),
+                            )
+                            suggestion.save()
+                            stats["granola_extracted"] += 1
+                        print(f"   ✓ {meeting['title']}: {len(ai_items)} suggestions (AI)")
+                    else:
+                        # Neither regex nor AI found anything
+                        meeting_title = clean_text(meeting["title"])
+                        suggestion = Todo(
+                            title=f"Review meeting: {meeting_title}",
+                            source_type="granola",
+                            source_id=meeting["id"],
+                            source_context=meeting["title"],
+                            source_url=meeting.get("url"),
+                            is_suggestion=True,
+                        )
+                        suggestion.save()
+                        stats["granola_extracted"] += 1
+                        print(f"   ○ {meeting['title']}: created review suggestion")
 
                 # Mark as processed
                 granola.mark_processed(meeting["id"])
@@ -277,11 +308,72 @@ def run_sync(hours: int = 24) -> dict:
     # Update status file for menu bar app
     update_status_file(stats, total_extracted)
 
+    # Push to cloud (non-fatal)
+    try:
+        push_to_cloud()
+    except Exception as e:
+        print(f"   ⚠️  Cloud push error (non-fatal): {e}")
+
     return {
         "new_todos": total_extracted,
         "processed": total_processed,
         "errors": stats["errors"]
     }
+
+
+def push_to_cloud():
+    """Push pending suggestions to PythonAnywhere (whileyousleep.xyz).
+
+    Non-fatal: errors are logged but don't affect the sync.
+    Server-side deduplication means we can safely send all pending suggestions.
+    """
+    print("\n☁️  Pushing suggestions to cloud...")
+
+    config_path = Path(__file__).parent.parent / ".pythonanywhere-config.json"
+    if not config_path.exists():
+        print("   ⚠️  .pythonanywhere-config.json not found, skipping cloud sync")
+        return
+
+    try:
+        config = json.loads(config_path.read_text())
+        app_url = config.get("app_url", "").rstrip("/")
+        deploy_secret = config.get("deploy_secret", "")
+
+        if not app_url or not deploy_secret:
+            print("   ⚠️  Missing app_url or deploy_secret in config, skipping")
+            return
+
+        suggestions = Todo.get_suggestions()
+        if not suggestions:
+            print("   No pending suggestions to push")
+            return
+
+        payload = json.dumps({
+            "suggestions": [s.to_dict() for s in suggestions]
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{app_url}/api/suggestions/import",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Deploy-Token": deploy_secret,
+            },
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+
+        imported = result.get("imported", 0)
+        skipped = result.get("skipped", 0)
+        rejected = result.get("rejected", 0)
+        print(f"   ✅ Cloud sync: {imported} imported, {skipped} skipped, {rejected} rejected")
+
+    except urllib.error.URLError as e:
+        print(f"   ❌ Cloud sync failed (network): {e}")
+    except Exception as e:
+        print(f"   ❌ Cloud sync failed: {e}")
 
 
 def update_status_file(stats, total_extracted):

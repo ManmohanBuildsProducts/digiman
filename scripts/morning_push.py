@@ -2,6 +2,7 @@
 """Morning push script - Run at 8 AM via cron/launchd."""
 
 import sys
+import time
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -22,16 +23,23 @@ def run_morning_push() -> bool:
     # Ensure database exists
     init_db()
 
-    # Send briefing
+    # Send briefing with retry (DNS may not be ready after Mac sleep)
     pusher = SlackPusher()
-    success = pusher.send_briefing()
+    max_attempts = 3
+    delay = 30
 
-    if success:
-        print("\n✅ Morning briefing sent!")
-    else:
-        print("\n❌ Failed to send morning briefing")
+    for attempt in range(1, max_attempts + 1):
+        success = pusher.send_briefing()
+        if success:
+            print(f"\n✅ Morning briefing sent! (attempt {attempt}/{max_attempts})")
+            return True
 
-    return success
+        if attempt < max_attempts:
+            print(f"\n⚠️  Attempt {attempt}/{max_attempts} failed, retrying in {delay}s...")
+            time.sleep(delay)
+
+    print("\n❌ Failed to send morning briefing after all attempts")
+    return False
 
 
 if __name__ == "__main__":
