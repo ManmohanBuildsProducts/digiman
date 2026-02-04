@@ -7,24 +7,33 @@ import json
 from digiman.config import ANTHROPIC_API_KEY
 
 
-EXTRACTION_PROMPT = """You are an action item extractor for a busy product manager with ADHD. Your job is to identify concrete, actionable tasks from meeting notes or Slack messages.
+EXTRACTION_PROMPT = """You are an action item extractor for a busy product manager at a B2B marketplace startup (Badho). Extract ONLY concrete tasks that someone needs to DO.
 
-Rules:
-1. Only extract CLEAR action items - things that need to be done
-2. Each action item should be a single, specific task
-3. Ignore informational content, discussions, or decisions without actions
-4. Start each action item with a verb (Send, Review, Follow up, Schedule, etc.)
-5. Be concise - max 80 characters per item
-6. If no clear action items exist, return an empty array
-7. Maximum 5 action items per source
+RULES:
+1. Every item MUST start with an action verb (Fix, Send, Build, Update, Ship, Create, Schedule, Follow up, etc.)
+2. The "title" should be a clear, specific task (max 120 chars) — include the WHAT and WHO if mentioned
+3. The "description" MUST provide full context: WHY this matters, WHAT was discussed that led to this task, any deadlines or blockers mentioned, and who else is involved. Write 2-3 sentences. A reader should understand the task WITHOUT reading the original meeting notes.
+4. Max 5 items per source. Confidence 0.9+ only for explicitly stated tasks.
 
-Return JSON in this exact format:
+REJECT (return empty array if only these exist):
+- Observations, summaries, status updates, vague intentions
+- "Focus on X", "Think about Y", "Good progress on Z"
+
+GOOD example:
+{
+  "title": "Fix global search integration to show new brand cards",
+  "description": "Priyanshu is working on this — the current search doesn't surface the new brand card component, which is blocking the upcoming release. Discussed in context of search experience fixes and needs to be done tonight.",
+  "confidence": 0.95
+}
+
+BAD example (DO NOT extract):
+- "Strong performance indicates delivery should be priority focus"
+- "Review meeting: Delivery Sync"
+
+Return JSON:
 {
   "action_items": [
-    {
-      "title": "Action item title starting with verb",
-      "confidence": 0.95
-    }
+    {"title": "Verb + specific task", "description": "2-3 sentences of context", "confidence": 0.95}
   ]
 }
 
@@ -74,7 +83,7 @@ class ActionExtractor:
 
             response = self.client.messages.create(
                 model="claude-3-haiku-20240307",  # Fast and cheap for extraction
-                max_tokens=1024,
+                max_tokens=2048,
                 messages=[
                     {
                         "role": "user",
@@ -101,7 +110,8 @@ class ActionExtractor:
                 for item in items:
                     if isinstance(item, dict) and item.get("title"):
                         result.append({
-                            "title": item["title"][:100],  # Max 100 chars
+                            "title": item["title"][:150],
+                            "description": item.get("description", ""),
                             "confidence": float(item.get("confidence", 0.8))
                         })
 

@@ -3,6 +3,7 @@
 
 import sys
 import json
+import re
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -23,6 +24,41 @@ from digiman.extractors import ActionExtractor
 def clean_text(text: str) -> str:
     """Clean text - remove newlines but preserve full content."""
     return text.strip().replace("\n", " ").replace("  ", " ")
+
+
+def is_actionable(title: str) -> bool:
+    """Filter out non-actionable suggestions before saving.
+
+    Rejects observations, generic reviews, status summaries, and noise.
+    """
+    t = title.lower().strip()
+
+    # Too short
+    if len(t) < 15:
+        return False
+
+    # Generic review fallbacks
+    if t.startswith("review meeting"):
+        return False
+
+    # Observations / summaries (not tasks)
+    observation_starters = [
+        "strong performance", "good progress", "overall ", "in summary",
+        "key takeaway", "the team ", "discussion about", "talked about",
+        "no business topics", "no action items", "nothing to report",
+        "no updates", "general discussion", "status update",
+    ]
+    for phrase in observation_starters:
+        if t.startswith(phrase):
+            return False
+
+    # Vague non-actionable patterns
+    if re.match(r'^(discussed|noted|mentioned|agreed|acknowledged)\b', t):
+        return False
+
+    # Must start with a verb or contain actionable language
+    # (loose check — AI output usually starts with verbs already)
+    return True
 
 
 def run_sync(hours: int = 24) -> dict:
@@ -72,69 +108,67 @@ def run_sync(hours: int = 24) -> dict:
 
         for meeting in meetings:
             try:
-                # Use action items extracted from summary
-                action_items = meeting.get("action_items", [])
-
-                if action_items:
-                    # Create SUGGESTIONS from extracted action items
-                    for item in action_items:
-                        title = clean_text(str(item))
-                        if not title:
-                            continue
-
-                        suggestion = Todo(
-                            title=title,
-                            source_type="granola",
-                            source_id=meeting["id"],
-                            source_context=meeting["title"],
-                            source_url=meeting.get("url"),
-                            is_suggestion=True,  # Mark as suggestion, not todo
-                        )
-                        suggestion.save()
-                        stats["granola_extracted"] += 1
-
-                    print(f"   ✓ {meeting['title']}: {len(action_items)} suggestions")
-                else:
-                    # No regex matches - try AI extraction as fallback
-                    ai_items = []
+                # Primary: AI extraction on full transcript (summary + notes)
+                ai_items = []
+                content = granola.get_content_for_extraction(meeting)
+                if content.strip():
                     try:
-                        content = granola.get_content_for_extraction(meeting)
-                        if content.strip():
-                            ai_items = extractor.extract(content, source_type="meeting")
+                        ai_items = extractor.extract(content, source_type="meeting")
                     except Exception as e:
-                        print(f"   ⚠️  AI extraction failed: {e}")
+                        print(f"   ⚠️  AI extraction failed for {meeting['title']}: {e}")
 
-                    if ai_items:
-                        for ai_item in ai_items:
-                            title = clean_text(ai_item.get("title", ""))
-                            if not title:
-                                continue
-                            suggestion = Todo(
-                                title=title,
-                                source_type="granola",
-                                source_id=meeting["id"],
-                                source_context=meeting["title"],
-                                source_url=meeting.get("url"),
-                                is_suggestion=True,
-                                extraction_confidence=ai_item.get("confidence", 0.8),
-                            )
-                            suggestion.save()
-                            stats["granola_extracted"] += 1
-                        print(f"   ✓ {meeting['title']}: {len(ai_items)} suggestions (AI)")
-                    else:
-                        # Neither regex nor AI found anything
-                        meeting_title = clean_text(meeting["title"])
-                        suggestion = Todo(
-                            title=f"Review meeting: {meeting_title}",
-                            source_type="granola",
-                            source_id=meeting["id"],
-                            source_context=meeting["title"],
-                            source_url=meeting.get("url"),
-                            is_suggestion=True,
-                        )
-                        suggestion.save()
-                        stats["granola_extracted"] += 1
-                        print(f"   ○ {meeting['title']}: created review suggestion")
+                # Fallback: regex-extracted action items from summary
+                # Build context from meeting summary for regex items
+                if not ai_items:
+                    regex_items = meeting.get("action_items", [])
+                    if regex_items:
+                        # Build a description from meeting context so regex items aren't naked
+                        summary_snippet = (meeting.get("summary_text") or "")[:500].strip()
+                        meeting_context = f"From meeting: {meeting.get('title', 'Untitled')}"
+                        if summary_snippet:
+                            meeting_context += f"\n\nMeeting context: {summary_snippet}"
+                        ai_items = [
+                            {"title": str(item), "description": meeting_context, "confidence": 0.6}
+                            for item in regex_items
+                        ]
+
+                # Save filtered results
+                saved = 0
+                for item in ai_items:
+                    title = clean_text(item.get("title", "") if isinstance(item, dict) else str(item))
+                    if not title or not is_actionable(title):
+                        continue
+
+                    # Description: AI provides rich context, regex gets meeting summary
+                    description = ""
+                    if isinstance(item, dict):
+                        description = item.get("description", "")
+                    if not description:
+                        # Fallback: build from meeting metadata
+                        summary_snippet = (meeting.get("summary_text") or "")[:500].strip()
+                        description = f"From meeting: {meeting.get('title', 'Untitled')}"
+                        if summary_snippet:
+                            description += f"\n\nContext: {summary_snippet}"
+
+                    suggestion = Todo(
+                        title=title,
+                        description=clean_text(description) if len(description) < 200 else description.strip(),
+                        source_type="granola",
+                        source_id=meeting["id"],
+                        source_context=meeting["title"],
+                        source_url=meeting.get("url"),
+                        is_suggestion=True,
+                        extraction_confidence=item.get("confidence", 0.8) if isinstance(item, dict) else 0.6,
+                    )
+                    suggestion.save()
+                    saved += 1
+                    stats["granola_extracted"] += 1
+
+                if saved:
+                    source = "AI" if content.strip() else "regex"
+                    print(f"   ✓ {meeting['title']}: {saved} suggestions ({source})")
+                else:
+                    print(f"   ○ {meeting['title']}: no actionable items found, skipping")
 
                 # Mark as processed
                 granola.mark_processed(meeting["id"])

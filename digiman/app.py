@@ -121,7 +121,31 @@ def should_reject_suggestion(title: str, description: str = None) -> tuple[bool,
         if re.search(pattern, title_lower):
             return True, "fyi_message"
 
-    # 6. Too short to be actionable (likely noise)
+    # 6. Generic review fallbacks (no value)
+    generic_patterns = [
+        r'^review meeting[:.]?\s',
+        r'^no business topics',
+        r'^no action items',
+        r'^nothing to report',
+        r'^no updates',
+        r'^general discussion',
+    ]
+    for pattern in generic_patterns:
+        if re.match(pattern, title_lower):
+            return True, "generic_noise"
+
+    # 7. Observations / summaries (not actionable)
+    observation_patterns = [
+        r'^(strong|good|great|overall|key)\s+(performance|progress|takeaway|point)',
+        r'^(discussed|noted|mentioned|agreed|acknowledged|talked about)\b',
+        r'^(the team|team discussed|meeting covered|in summary)',
+        r'^status update',
+    ]
+    for pattern in observation_patterns:
+        if re.match(pattern, title_lower):
+            return True, "observation"
+
+    # 8. Too short to be actionable (likely noise)
     if len(title) < 10:
         return True, "too_short"
 
