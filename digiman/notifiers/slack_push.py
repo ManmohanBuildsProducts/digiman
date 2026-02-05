@@ -4,6 +4,9 @@ from datetime import date
 from typing import Optional
 
 from digiman.config import SLACK_BOT_TOKEN, SLACK_USER_ID
+
+# Post briefings to #mydailyplanner (private channel)
+BRIEFING_CHANNEL = "C093CG2KA1G"
 from digiman.models import Todo
 
 
@@ -122,18 +125,14 @@ class SlackPusher:
             # Format message
             message = self.format_briefing(todos, suggestions)
 
-            # Open DM channel
-            dm_response = self.client.conversations_open(users=[self.user_id])
-            channel_id = dm_response["channel"]["id"]
-
-            # Send message
+            # Send to #mydailyplanner channel
             self.client.chat_postMessage(
-                channel=channel_id,
+                channel=BRIEFING_CHANNEL,
                 text=message,
                 mrkdwn=True
             )
 
-            print("✅ Morning briefing sent to Slack DM")
+            print("✅ Morning briefing sent to #mydailyplanner")
             return True
 
         except Exception as e:
