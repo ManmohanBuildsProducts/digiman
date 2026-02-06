@@ -5,20 +5,20 @@
 {% block content %}
 <div class="space-y-6" x-data="statusApp()">
     <!-- Header -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
                     <i data-lucide="activity" class="w-6 h-6 text-white"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-900">Automation Monitor</h1>
-                    <p class="text-sm text-gray-500">Track SMART_PASTE, syncs, and scheduled jobs</p>
+                    <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Automation Monitor</h1>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Track SMART_PASTE, syncs, and scheduled jobs</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 {% if cron_status.last_synced_from_local %}
-                <span class="text-xs text-gray-400">Synced from Mac</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">Synced from Mac</span>
                 {% endif %}
                 <button @click="runSync()"
                         :disabled="isSyncing"
@@ -33,70 +33,70 @@
     <!-- Status Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Last Sync -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="clock" class="w-5 h-5 text-blue-600"></i>
+                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                    <i data-lucide="clock" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
                 </div>
-                <div class="text-sm font-medium text-gray-500">Last Sync</div>
+                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Last Sync</div>
             </div>
             {% if cron_status.last_sync %}
-            <div class="text-lg font-bold text-gray-900">{{ cron_status.last_sync[:16] | replace('T', ' ') }}</div>
+            <div class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ cron_status.last_sync[:16] | replace('T', ' ') }}</div>
             <div class="text-sm mt-1">
                 {% if cron_status.last_sync_status == 'success' %}
-                <span class="text-green-600">✓ Success</span>
+                <span class="text-green-600 dark:text-green-400">✓ Success</span>
                 {% elif cron_status.last_sync_status == 'error' %}
-                <span class="text-red-600">✗ Failed</span>
+                <span class="text-red-600 dark:text-red-400">✗ Failed</span>
                 {% else %}
-                <span class="text-gray-500">{{ cron_status.last_sync_status or 'Unknown' }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ cron_status.last_sync_status or 'Unknown' }}</span>
                 {% endif %}
             </div>
             {% else %}
-            <div class="text-lg font-bold text-gray-400">Never</div>
-            <div class="text-sm text-gray-500 mt-1">Awaiting first sync</div>
+            <div class="text-lg font-bold text-gray-400 dark:text-gray-500">Never</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Awaiting first sync</div>
             {% endif %}
         </div>
 
         <!-- Items Synced -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                <div class="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-600 dark:text-green-400"></i>
                 </div>
-                <div class="text-sm font-medium text-gray-500">Items Processed</div>
+                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Items Processed</div>
             </div>
-            <div class="text-2xl font-bold text-gray-900">{{ cron_status.last_sync_count or 0 }}</div>
-            <div class="text-sm text-gray-500 mt-1">From last sync</div>
+            <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ cron_status.last_sync_count or 0 }}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">From last sync</div>
         </div>
 
         <!-- Claude Code -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                    {% if cron_status.claude_code and cron_status.claude_code.available %}bg-green-100{% else %}bg-yellow-100{% endif %}">
+                    {% if cron_status.claude_code and cron_status.claude_code.available %}bg-green-100 dark:bg-green-900/50{% else %}bg-yellow-100 dark:bg-yellow-900/50{% endif %}">
                     <span class="text-xl">🤖</span>
                 </div>
-                <div class="text-sm font-medium text-gray-500">Claude Code</div>
+                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Claude Code</div>
             </div>
             {% if cron_status.claude_code and cron_status.claude_code.available %}
-            <div class="text-lg font-bold text-green-600">Ready</div>
-            <div class="text-sm text-gray-500 mt-1">CLI available</div>
+            <div class="text-lg font-bold text-green-600 dark:text-green-400">Ready</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">CLI available</div>
             {% else %}
-            <div class="text-lg font-bold text-yellow-600">Not Detected</div>
-            <div class="text-sm text-gray-500 mt-1">Check local setup</div>
+            <div class="text-lg font-bold text-yellow-600 dark:text-yellow-400">Not Detected</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Check local setup</div>
             {% endif %}
         </div>
 
         <!-- Sources -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i data-lucide="layers" class="w-5 h-5 text-purple-600"></i>
+                <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center">
+                    <i data-lucide="layers" class="w-5 h-5 text-purple-600 dark:text-purple-400"></i>
                 </div>
-                <div class="text-sm font-medium text-gray-500">Sources</div>
+                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Sources</div>
             </div>
-            <div class="text-lg font-bold text-gray-900">{{ cron_status.sources | length if cron_status.sources else 0 }}</div>
-            <div class="text-sm text-gray-500 mt-1 truncate">
+            <div class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ cron_status.sources | length if cron_status.sources else 0 }}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
                 {% if cron_status.sources %}
                 {{ cron_status.sources | join(', ') }}
                 {% else %}
@@ -107,29 +107,29 @@
     </div>
 
     <!-- Automation Jobs -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200">
-            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Automation Jobs</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Automation Jobs</h2>
         </div>
-        <div class="divide-y divide-gray-100">
+        <div class="divide-y divide-gray-100 dark:divide-gray-700">
             <!-- SMART_PASTE -->
             {% set sp = cron_status.get('jobs', {}).get('smart_paste', {}) if cron_status else {} %}
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                        {% if sp.last_status == 'success' %}bg-green-100{% elif sp.last_status == 'error' %}bg-red-100{% else %}bg-gray-100{% endif %}">
+                        {% if sp.last_status == 'success' %}bg-green-100 dark:bg-green-900/50{% elif sp.last_status == 'error' %}bg-red-100 dark:bg-red-900/50{% else %}bg-gray-100 dark:bg-gray-700{% endif %}">
                         <span class="text-xl">🧠</span>
                     </div>
                     <div>
-                        <div class="font-medium text-gray-900">SMART_PASTE</div>
-                        <div class="text-sm text-gray-500">Process meetings via Claude Code</div>
+                        <div class="font-medium text-gray-900 dark:text-gray-100">SMART_PASTE</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Process meetings via Claude Code</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm {% if sp.last_status == 'success' %}text-green-600{% elif sp.last_status == 'error' %}text-red-600{% else %}text-gray-500{% endif %}">
+                    <div class="text-sm {% if sp.last_status == 'success' %}text-green-600 dark:text-green-400{% elif sp.last_status == 'error' %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
                         {% if sp.last_status == 'success' %}✓ {{ sp.last_count or 0 }} items{% elif sp.last_status == 'error' %}✗ Failed{% else %}○ Not run{% endif %}
                     </div>
-                    <div class="text-xs text-gray-400">1:30 AM daily</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">1:30 AM daily</div>
                 </div>
             </div>
 
@@ -138,19 +138,19 @@
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                        {% if wd.last_status == 'triggered' %}bg-yellow-100{% elif wd.last_status == 'skipped' %}bg-gray-100{% else %}bg-blue-100{% endif %}">
+                        {% if wd.last_status == 'triggered' %}bg-yellow-100 dark:bg-yellow-900/50{% elif wd.last_status == 'skipped' %}bg-gray-100 dark:bg-gray-700{% else %}bg-blue-100 dark:bg-blue-900/50{% endif %}">
                         <span class="text-xl">🐕</span>
                     </div>
                     <div>
-                        <div class="font-medium text-gray-900">Watchdog</div>
-                        <div class="text-sm text-gray-500">Ensures sync completes</div>
+                        <div class="font-medium text-gray-900 dark:text-gray-100">Watchdog</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Ensures sync completes</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm {% if wd.last_status == 'triggered' %}text-yellow-600{% elif wd.last_status == 'skipped' %}text-gray-500{% else %}text-blue-600{% endif %}">
+                    <div class="text-sm {% if wd.last_status == 'triggered' %}text-yellow-600 dark:text-yellow-400{% elif wd.last_status == 'skipped' %}text-gray-500 dark:text-gray-400{% else %}text-blue-600 dark:text-blue-400{% endif %}">
                         {% if wd.last_status == 'triggered' %}⚡ Triggered{% elif wd.last_status == 'skipped' %}○ Skipped{% else %}● Active{% endif %}
                     </div>
-                    <div class="text-xs text-gray-400">Every 15 min</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">Every 15 min</div>
                 </div>
             </div>
 
@@ -159,19 +159,19 @@
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                        {% if ns.last_status == 'success' %}bg-green-100{% elif ns.last_status == 'error' %}bg-red-100{% else %}bg-gray-100{% endif %}">
+                        {% if ns.last_status == 'success' %}bg-green-100 dark:bg-green-900/50{% elif ns.last_status == 'error' %}bg-red-100 dark:bg-red-900/50{% else %}bg-gray-100 dark:bg-gray-700{% endif %}">
                         <span class="text-xl">📝</span>
                     </div>
                     <div>
-                        <div class="font-medium text-gray-900">Nightly Sync</div>
-                        <div class="text-sm text-gray-500">Extract action items to Digiman</div>
+                        <div class="font-medium text-gray-900 dark:text-gray-100">Nightly Sync</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Extract action items to Digiman</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm {% if ns.last_status == 'success' %}text-green-600{% elif ns.last_status == 'error' %}text-red-600{% else %}text-gray-500{% endif %}">
+                    <div class="text-sm {% if ns.last_status == 'success' %}text-green-600 dark:text-green-400{% elif ns.last_status == 'error' %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
                         {% if ns.last_status == 'success' %}✓ {{ ns.last_count or 0 }} items{% elif ns.last_status == 'error' %}✗ Failed{% else %}○ Not run{% endif %}
                     </div>
-                    <div class="text-xs text-gray-400">2:00 AM daily</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">2:00 AM daily</div>
                 </div>
             </div>
 
@@ -180,19 +180,19 @@
             <div class="p-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center
-                        {% if mp.last_status == 'success' %}bg-green-100{% elif mp.last_status == 'error' %}bg-red-100{% else %}bg-gray-100{% endif %}">
+                        {% if mp.last_status == 'success' %}bg-green-100 dark:bg-green-900/50{% elif mp.last_status == 'error' %}bg-red-100 dark:bg-red-900/50{% else %}bg-gray-100 dark:bg-gray-700{% endif %}">
                         <span class="text-xl">🌅</span>
                     </div>
                     <div>
-                        <div class="font-medium text-gray-900">Morning Push</div>
-                        <div class="text-sm text-gray-500">Send daily todos to Slack</div>
+                        <div class="font-medium text-gray-900 dark:text-gray-100">Morning Push</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Send daily todos to Slack</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm {% if mp.last_status == 'success' %}text-green-600{% elif mp.last_status == 'error' %}text-red-600{% else %}text-gray-500{% endif %}">
+                    <div class="text-sm {% if mp.last_status == 'success' %}text-green-600 dark:text-green-400{% elif mp.last_status == 'error' %}text-red-600 dark:text-red-400{% else %}text-gray-500 dark:text-gray-400{% endif %}">
                         {% if mp.last_status == 'success' %}✓ Sent{% elif mp.last_status == 'error' %}✗ Failed{% else %}○ Not run{% endif %}
                     </div>
-                    <div class="text-xs text-gray-400">8:00 AM daily</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">8:00 AM daily</div>
                 </div>
             </div>
         </div>
@@ -200,12 +200,12 @@
 
     <!-- Backfill Status (if pending) -->
     {% if cron_status.backfill and cron_status.backfill.pending_days > 0 %}
-    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
         <div class="flex items-center gap-3">
             <span class="text-2xl">📅</span>
             <div>
-                <div class="font-medium text-blue-900">Backfill Pending</div>
-                <div class="text-sm text-blue-700">
+                <div class="font-medium text-blue-900 dark:text-blue-100">Backfill Pending</div>
+                <div class="text-sm text-blue-700 dark:text-blue-300">
                     {{ cron_status.backfill.pending_days }} days to process
                     ({{ cron_status.backfill.meetings_pending or 0 }} meetings)
                 </div>
@@ -215,53 +215,53 @@
     {% endif %}
 
     <!-- Sync History -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200">
-            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Recent Activity</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Recent Activity</h2>
         </div>
-        <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+        <div class="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
             {% if cron_status.history %}
                 {% for entry in cron_status.history[:15] %}
                 {% if entry.status != 'running' %}
                 <div class="p-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         {% if entry.status == 'success' %}
-                        <div class="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center">
-                            <span class="text-green-600 text-xs">✓</span>
+                        <div class="w-7 h-7 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
+                            <span class="text-green-600 dark:text-green-400 text-xs">✓</span>
                         </div>
                         {% elif entry.status == 'error' %}
-                        <div class="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center">
-                            <span class="text-red-600 text-xs">✗</span>
+                        <div class="w-7 h-7 bg-red-100 dark:bg-red-900/50 rounded-full flex items-center justify-center">
+                            <span class="text-red-600 dark:text-red-400 text-xs">✗</span>
                         </div>
                         {% elif entry.status == 'skipped' %}
-                        <div class="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                            <span class="text-gray-500 text-xs">○</span>
+                        <div class="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                            <span class="text-gray-500 dark:text-gray-400 text-xs">○</span>
                         </div>
                         {% else %}
-                        <div class="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span class="text-blue-600 text-xs">●</span>
+                        <div class="w-7 h-7 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                            <span class="text-blue-600 dark:text-blue-400 text-xs">●</span>
                         </div>
                         {% endif %}
                         <div>
-                            <div class="text-sm font-medium text-gray-900">
+                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {% if entry.source == 'smart_paste' %}SMART_PASTE
                                 {% elif entry.source == 'watchdog' %}Watchdog
                                 {% elif entry.source == 'nightly_sync' %}Nightly Sync
                                 {% elif entry.source == 'morning_push' %}Morning Push
                                 {% else %}{{ entry.source or 'Manual' }}{% endif %}
-                                {% if entry.count %}<span class="text-gray-500 font-normal">· {{ entry.count }} items</span>{% endif %}
+                                {% if entry.count %}<span class="text-gray-500 dark:text-gray-400 font-normal">· {{ entry.count }} items</span>{% endif %}
                             </div>
                             {% if entry.error %}
-                            <div class="text-xs text-red-500 truncate max-w-xs">{{ entry.error[:50] }}{% if entry.error|length > 50 %}...{% endif %}</div>
+                            <div class="text-xs text-red-500 dark:text-red-400 truncate max-w-xs">{{ entry.error[:50] }}{% if entry.error|length > 50 %}...{% endif %}</div>
                             {% endif %}
                         </div>
                     </div>
-                    <div class="text-xs text-gray-400">{{ entry.timestamp[:16] | replace('T', ' ') if entry.timestamp else '' }}</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">{{ entry.timestamp[:16] | replace('T', ' ') if entry.timestamp else '' }}</div>
                 </div>
                 {% endif %}
                 {% endfor %}
             {% else %}
-                <div class="p-8 text-center text-gray-400">
+                <div class="p-8 text-center text-gray-400 dark:text-gray-500">
                     <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
                     <p class="text-sm">No activity yet</p>
                     <p class="text-xs mt-1">Status syncs from your Mac automatically</p>
@@ -271,35 +271,35 @@
     </div>
 
     <!-- Configuration -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-4 border-b border-gray-200">
-            <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Configuration</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Configuration</h2>
         </div>
         <div class="p-4 space-y-3">
             <div class="flex items-center justify-between py-2">
                 <div>
-                    <div class="text-sm font-medium text-gray-900">Granola Integration</div>
-                    <div class="text-xs text-gray-500">Extract from meeting transcripts</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Granola Integration</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Extract from meeting transcripts</div>
                 </div>
-                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.granola_enabled else 'bg-gray-100 text-gray-500' }}">
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' if cron_status.granola_enabled else 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400' }}">
                     {{ 'Enabled' if cron_status.granola_enabled else 'Not configured' }}
                 </span>
             </div>
             <div class="flex items-center justify-between py-2">
                 <div>
-                    <div class="text-sm font-medium text-gray-900">Slack Integration</div>
-                    <div class="text-xs text-gray-500">Import @mentions as todos</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Slack Integration</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Import @mentions as todos</div>
                 </div>
-                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.slack_enabled else 'bg-gray-100 text-gray-500' }}">
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' if cron_status.slack_enabled else 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400' }}">
                     {{ 'Enabled' if cron_status.slack_enabled else 'Not configured' }}
                 </span>
             </div>
             <div class="flex items-center justify-between py-2">
                 <div>
-                    <div class="text-sm font-medium text-gray-900">Morning Push</div>
-                    <div class="text-xs text-gray-500">Daily Slack notification</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Morning Push</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Daily Slack notification</div>
                 </div>
-                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 text-green-700' if cron_status.morning_push_enabled else 'bg-gray-100 text-gray-500' }}">
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' if cron_status.morning_push_enabled else 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400' }}">
                     {{ 'Enabled' if cron_status.morning_push_enabled else 'Not configured' }}
                 </span>
             </div>

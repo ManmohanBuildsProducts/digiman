@@ -14,7 +14,8 @@
                {% if todo.status == 'completed' %}checked{% endif %}
                hx-post="/api/todos/{{ todo.id }}/toggle"
                hx-target="#todo-{{ todo.id }}"
-               hx-swap="outerHTML">
+               hx-swap="outerHTML"
+               aria-label="Mark todo as {% if todo.status == 'completed' %}incomplete{% else %}complete{% endif %}">
 
         <!-- Content -->
         <div class="flex-1 min-w-0">
